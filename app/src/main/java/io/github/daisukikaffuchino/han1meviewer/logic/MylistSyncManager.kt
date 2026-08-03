@@ -18,7 +18,8 @@ import kotlinx.coroutines.flow.Flow
  * 本地收藏 / 稍后观看 / 播放清单 与云端的同步引擎。
  *
  * 未登录时的操作全部写入本地数据库（mylist.db），
- * 登录成功后调用 [syncOnLogin] 执行双向合并：
+ * 登录成功后、以及打开收藏 / 稍后观看 / 播放清单界面时调用 [sync]
+ * 执行双向合并（未登录时直接返回）：
  * - 推送：本地删除墓碑（云端删除）→ 本地脏数据（收藏 / 稍后观看 / 播放清单）推送到云端
  * - 拉取：云端全量列表拉取后合并到本地，云端优先（server-wins）
  *
@@ -30,9 +31,10 @@ object MylistSyncManager {
     private var isSyncing = false
 
     /**
-     * 登录成功后调用，失败不影响登录流程。
+     * 执行双向合并。登录成功后或打开列表界面时调用，
+     * 未登录或正在同步中直接返回，失败不影响调用方。
      */
-    suspend fun syncOnLogin() {
+    suspend fun sync() {
         if (isSyncing) return
         isSyncing = true
         try {

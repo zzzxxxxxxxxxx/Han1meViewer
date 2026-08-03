@@ -50,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.daisukikaffuchino.han1meviewer.R
+import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
 import io.github.daisukikaffuchino.han1meviewer.logic.state.PageLoadingState
 import io.github.daisukikaffuchino.han1meviewer.logic.state.WebsiteState
@@ -112,6 +113,7 @@ fun PlaylistBottomSheet(
 
     LaunchedEffect(currentCode) {
         if (currentCode.isNotEmpty()) {
+            MylistSyncManager.sync()
             if (playlist.isEmpty()) {
                 vm.getPlaylistItems(1, currentCode, true)
             }

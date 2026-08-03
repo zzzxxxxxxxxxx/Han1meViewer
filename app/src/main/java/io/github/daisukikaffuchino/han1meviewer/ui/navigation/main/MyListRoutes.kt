@@ -1,9 +1,11 @@
 package io.github.daisukikaffuchino.han1meviewer.ui.navigation.main
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.ui.screen.home.VideoGridScreen
@@ -16,6 +18,9 @@ fun FavVideoRouteScreen(
     onNavigateToVideo: (String) -> Unit,
 ) {
     val isLoggedIn by SettingsRepository.loginStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) MylistSyncManager.sync()
+    }
     if (isLoggedIn) {
         val viewModel: MyListViewModel = viewModel()
         val fav = viewModel.fav
@@ -66,6 +71,9 @@ fun WatchLaterRouteScreen(
     onNavigateToVideo: (String) -> Unit,
 ) {
     val isLoggedIn by SettingsRepository.loginStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) MylistSyncManager.sync()
+    }
     if (isLoggedIn) {
         val viewModel: MyListViewModel = viewModel()
         val wl = viewModel.watchLater
