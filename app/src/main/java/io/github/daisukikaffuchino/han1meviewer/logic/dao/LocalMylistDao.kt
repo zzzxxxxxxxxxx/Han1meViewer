@@ -131,6 +131,9 @@ interface LocalMylistDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertTombstone(entity: LocalMylistTombstoneEntity)
 
+    @Query("DELETE FROM LocalMylistTombstoneEntity")
+    suspend fun deleteAllTombstones()
+
     @Query("DELETE FROM LocalMylistTombstoneEntity WHERE videoCode = :videoCode")
     suspend fun deleteTombstone(videoCode: String)
 

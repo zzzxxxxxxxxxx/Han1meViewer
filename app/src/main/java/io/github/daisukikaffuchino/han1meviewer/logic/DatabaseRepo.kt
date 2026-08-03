@@ -339,6 +339,28 @@ object DatabaseRepo {
         suspend fun upsertTombstone(entity: LocalMylistTombstoneEntity) = dao.upsertTombstone(entity)
         suspend fun deleteTombstone(videoCode: String) = dao.deleteTombstone(videoCode)
 
+        /**
+         * 写入删除墓碑，与已有墓碑的标志做合并（收藏 / 稍后观看并存时不会互相覆盖）。
+         */
+        suspend fun upsertTombstoneMerged(
+            videoCode: String,
+            isFav: Boolean = false,
+            isWatchLater: Boolean = false,
+        ) {
+            val existing = dao.findTombstone(videoCode)
+            dao.upsertTombstone(
+                existing?.copy(
+                    isFav = existing.isFav || isFav,
+                    isWatchLater = existing.isWatchLater || isWatchLater,
+                ) ?: LocalMylistTombstoneEntity(
+                    videoCode = videoCode,
+                    isFav = isFav,
+                    isWatchLater = isWatchLater,
+                    deletedTime = System.currentTimeMillis(),
+                )
+            )
+        }
+
         //</editor-fold>
     }
 }

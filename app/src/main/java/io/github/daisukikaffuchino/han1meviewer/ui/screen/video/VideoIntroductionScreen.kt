@@ -632,7 +632,7 @@ private fun MyListDialog(
     var selectedStates by remember(myList.myListInfo) {
         mutableStateOf(myList.myListInfo.map { it.isSelected })
     }
-    val hasCustomPlaylist = myList.myListInfo.any { it.code != "save" }
+    val hasCustomPlaylist = myList.myListInfo.any { it.code != HanimeVideo.MyList.SAVE_CODE }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -673,7 +673,7 @@ private fun MyListDialog(
                                 onCheckedChange = null,
                             )
                             Text(
-                                text = if (info.code == "save") {
+                                text = if (info.code == HanimeVideo.MyList.SAVE_CODE) {
                                     stringResource(R.string.watch_later)
                                 } else {
                                     info.title

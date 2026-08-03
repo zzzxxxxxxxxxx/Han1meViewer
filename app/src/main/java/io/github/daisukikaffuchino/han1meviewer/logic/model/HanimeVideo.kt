@@ -94,6 +94,13 @@ data class HanimeVideo(
         var isWatchLater: Boolean,
         val myListInfo: List<MyListInfo>,
     ) {
+        companion object {
+            /**
+             * 稍后观看在清单勾选弹层中的特殊 code。
+             */
+            const val SAVE_CODE = "save"
+        }
+
         data class MyListInfo(
             val code: String,
             val title: String,

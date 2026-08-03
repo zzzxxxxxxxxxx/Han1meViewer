@@ -3,10 +3,12 @@ package io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.mylist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.daisukikaffuchino.han1meviewer.logic.DatabaseRepo
+import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.NetworkRepo
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
-import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
+import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeVideo
 import io.github.daisukikaffuchino.han1meviewer.logic.model.MyListItems
 import io.github.daisukikaffuchino.han1meviewer.logic.state.PageLoadingState
 import io.github.daisukikaffuchino.han1meviewer.logic.state.WebsiteState
@@ -23,10 +25,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 本地收藏 / 稍后观看列表 ViewModel（未登录模式）。
+ * 本地收藏 / 稍后观看列表 ViewModel。
  *
- * 数据源为本地数据库 mylist.db，删除时按登录状态
- * 实时同步云端或记录删除墓碑（登录后由同步引擎推送）。
+ * 数据源统一为本地数据库 mylist.db（登录 / 未登录一致），
+ * 已登录时由路由层触发 MylistSyncManager.sync 与云端双向合并；
+ * 删除时按登录状态实时同步云端或记录删除墓碑（登录后由同步引擎推送）。
  *
  * @project Han1meViewer
  */
@@ -40,7 +43,7 @@ class LocalVideoListViewModel(
     val itemsStateFlow: StateFlow<PageLoadingState<MyListItems<HanimeInfo>>> =
         _itemsStateFlow.asStateFlow()
 
-    private val itemsFlow = (if (isFavoriteMode) {
+    val items: StateFlow<List<HanimeInfo>> = (if (isFavoriteMode) {
         DatabaseRepo.LocalMylist.observeFavorites()
     } else {
         DatabaseRepo.LocalMylist.observeWatchLater()
@@ -52,20 +55,16 @@ class LocalVideoListViewModel(
         emptyList()
     )
 
-    val items: StateFlow<List<HanimeInfo>> = itemsFlow
-
-    val loadedPageCount: StateFlow<Int> =
-        MutableStateFlow(1).asStateFlow()
-
-    val isLoadingMore: StateFlow<Boolean> =
-        MutableStateFlow(false).asStateFlow()
+    // 本地数据全量加载，无分页：VideoGridScreen 需要这两个状态位
+    val loadedPageCount: StateFlow<Int> = MutableStateFlow(1)
+    val isLoadingMore: StateFlow<Boolean> = MutableStateFlow(false)
 
     private val _deleteFlow = MutableSharedFlow<WebsiteState<Boolean>>()
     val deleteFlow = _deleteFlow.asSharedFlow()
 
     init {
         viewModelScope.launch {
-            itemsFlow.collect { items ->
+            items.collect { items ->
                 _itemsStateFlow.value = if (items.isEmpty()) {
                     PageLoadingState.NoMoreData
                 } else {
@@ -75,8 +74,20 @@ class LocalVideoListViewModel(
         }
     }
 
-    fun refresh() = Unit
+    /**
+     * 下拉刷新：已登录时触发云端同步（本地数据库更新后列表自动刷新），
+     * 未登录时本地数据已是实时，无需任何操作。
+     */
+    fun refresh() {
+        if (!SettingsRepository.isAlreadyLogin) return
+        viewModelScope.launch {
+            MylistSyncManager.sync()
+        }
+    }
 
+    /**
+     * 本地数据全量加载，无分页逻辑，仅满足 VideoGridScreen 的回调要求。
+     */
     fun loadMore() = Unit
 
     fun deleteItem(videoCode: String, position: Int) {
@@ -99,7 +110,7 @@ class LocalVideoListViewModel(
                         ).first()
                     } else {
                         NetworkRepo.addToMyList(
-                            listCode = "save",
+                            listCode = HanimeVideo.MyList.SAVE_CODE,
                             videoCode = videoCode,
                             isChecked = false,
                             position = position,
@@ -115,21 +126,11 @@ class LocalVideoListViewModel(
                     _deleteFlow.emit(WebsiteState.Error(IllegalStateException("delete failed")))
                 }
             } else {
-                val tombstone = DatabaseRepo.LocalMylist.findTombstone(videoCode)
-                val merged = if (isFavoriteMode) {
-                    tombstone?.copy(isFav = true) ?: LocalMylistTombstoneEntity(
-                        videoCode = videoCode,
-                        isFav = true,
-                        deletedTime = System.currentTimeMillis(),
-                    )
-                } else {
-                    tombstone?.copy(isWatchLater = true) ?: LocalMylistTombstoneEntity(
-                        videoCode = videoCode,
-                        isWatchLater = true,
-                        deletedTime = System.currentTimeMillis(),
-                    )
-                }
-                DatabaseRepo.LocalMylist.upsertTombstone(merged)
+                DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                    videoCode = videoCode,
+                    isFav = isFavoriteMode,
+                    isWatchLater = !isFavoriteMode,
+                )
                 removeLocalVideo(entity)
                 _deleteFlow.emit(WebsiteState.Success(true))
             }
@@ -140,7 +141,7 @@ class LocalVideoListViewModel(
      * 删除本地行，但若视频仍属于另一个列表（收藏 / 稍后观看并存），
      * 仅清除当前列表的标志而不是整行删除。
      */
-    private suspend fun removeLocalVideo(entity: io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity) {
+    private suspend fun removeLocalVideo(entity: LocalVideoEntity) {
         val remaining = if (isFavoriteMode) {
             entity.copy(isFav = false, favSynced = false)
         } else {

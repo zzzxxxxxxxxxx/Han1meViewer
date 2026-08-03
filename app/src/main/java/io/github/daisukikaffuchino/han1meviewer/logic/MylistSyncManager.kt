@@ -6,13 +6,14 @@ import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylis
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
+import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeVideo
 import io.github.daisukikaffuchino.han1meviewer.logic.model.MyListType
 import io.github.daisukikaffuchino.han1meviewer.logic.model.Playlists
 import io.github.daisukikaffuchino.han1meviewer.logic.state.PageLoadingState
 import io.github.daisukikaffuchino.han1meviewer.logic.state.WebsiteState
 import io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 
 /**
  * 本地收藏 / 稍后观看 / 播放清单 与云端的同步引擎。
@@ -54,18 +55,12 @@ object MylistSyncManager {
     }
 
     private suspend fun obtainCsrfToken(): String? {
-        var token = AppViewModel.csrfToken
-        if (token.isNullOrBlank()) {
-            runCatching {
-                NetworkRepo.getHomePage().first { state ->
-                    if (state is WebsiteState.Success) {
-                        token = state.info.csrfToken
-                        true
-                    } else state !is WebsiteState.Loading
-                }
+        AppViewModel.csrfToken?.takeIf { it.isNotBlank() }?.let { return it }
+        return runCatching {
+            NetworkRepo.getHomePage().firstOrNull()?.let { state ->
+                (state as? WebsiteState.Success)?.info?.csrfToken
             }
-        }
-        return token
+        }.getOrNull()
     }
 
     //<editor-fold desc="推送：删除墓碑">
@@ -76,25 +71,27 @@ object MylistSyncManager {
             var isFav = tombstone.isFav
             var isWatchLater = tombstone.isWatchLater
             if (isFav) {
-                runCatching {
+                val succeeded = runCatching {
                     NetworkRepo.addToMyFavVideo(
                         videoCode = tombstone.videoCode,
                         likeStatus = true,
                         currentUserId = userId,
                         token = token,
                     ).first()
-                }.onSuccess { isFav = false }
+                }.getOrNull() is WebsiteState.Success
+                if (succeeded) isFav = false
             }
             if (isWatchLater) {
-                runCatching {
+                val succeeded = runCatching {
                     NetworkRepo.addToMyList(
-                        listCode = "save",
+                        listCode = HanimeVideo.MyList.SAVE_CODE,
                         videoCode = tombstone.videoCode,
                         isChecked = false,
                         position = 0,
                         csrfToken = token,
                     ).first()
-                }.onSuccess { isWatchLater = false }
+                }.getOrNull() is WebsiteState.Success
+                if (succeeded) isWatchLater = false
             }
             if (!isFav && !isWatchLater) {
                 DatabaseRepo.LocalMylist.deleteTombstone(tombstone.videoCode)
@@ -180,14 +177,15 @@ object MylistSyncManager {
 
     private suspend fun pushDirtyFavorites(userId: String, token: String?) {
         for (entity in DatabaseRepo.LocalMylist.getDirtyFavorites()) {
-            runCatching {
+            val succeeded = runCatching {
                 NetworkRepo.addToMyFavVideo(
                     videoCode = entity.videoCode,
                     likeStatus = false,
                     currentUserId = userId,
                     token = token,
                 ).first()
-            }.onSuccess {
+            }.getOrNull() is WebsiteState.Success
+            if (succeeded) {
                 DatabaseRepo.LocalMylist.upsertVideo(entity.copy(favSynced = true))
             }
         }
@@ -195,15 +193,16 @@ object MylistSyncManager {
 
     private suspend fun pushDirtyWatchLater(userId: String, token: String?) {
         for (entity in DatabaseRepo.LocalMylist.getDirtyWatchLater()) {
-            runCatching {
+            val succeeded = runCatching {
                 NetworkRepo.addToMyList(
-                    listCode = "save",
+                    listCode = HanimeVideo.MyList.SAVE_CODE,
                     videoCode = entity.videoCode,
                     isChecked = true,
                     position = 0,
                     csrfToken = token,
                 ).first()
-            }.onSuccess {
+            }.getOrNull() is WebsiteState.Success
+            if (succeeded) {
                 DatabaseRepo.LocalMylist.upsertVideo(entity.copy(watchLaterSynced = true))
             }
         }
@@ -372,7 +371,7 @@ object MylistSyncManager {
         for (item in DatabaseRepo.LocalMylist.getDirtyPlaylistItems()) {
             val parent = DatabaseRepo.LocalMylist.findPlaylist(item.playlistCode) ?: continue
             if (!parent.synced) continue
-            runCatching {
+            val succeeded = runCatching {
                 NetworkRepo.addToMyList(
                     listCode = parent.code,
                     videoCode = item.videoCode,
@@ -380,7 +379,8 @@ object MylistSyncManager {
                     position = item.position,
                     csrfToken = token,
                 ).first()
-            }.onSuccess {
+            }.getOrNull() is WebsiteState.Success
+            if (succeeded) {
                 DatabaseRepo.LocalMylist.upsertPlaylistItem(item.copy(synced = true))
             }
         }

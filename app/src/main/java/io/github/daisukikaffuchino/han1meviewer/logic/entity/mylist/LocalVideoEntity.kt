@@ -3,6 +3,7 @@ package io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
+import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeVideo
 import io.github.daisukikaffuchino.han1meviewer.logic.model.VideoItemType
 import kotlinx.serialization.Serializable
 
@@ -44,4 +45,19 @@ data class LocalVideoEntity(
         reviews = reviews,
         currentArtist = currentArtist,
     )
+
+    companion object {
+        /**
+         * 从视频详情构造本地条目（用于首次写入本地库）。
+         */
+        fun fromVideo(videoCode: String, video: HanimeVideo?): LocalVideoEntity = LocalVideoEntity(
+            videoCode = videoCode,
+            title = video?.title.orEmpty(),
+            coverUrl = video?.coverUrl.orEmpty(),
+            views = video?.views,
+            reviews = video?.ratingCount?.toString(),
+            currentArtist = video?.artist?.name,
+            uploadTime = video?.uploadTime?.toString(),
+        )
+    }
 }

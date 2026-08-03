@@ -164,6 +164,7 @@ object BackupManager {
                 dao.upsertPlaylistItems(localPlaylistItems)
             }
             backup.localMylistTombstones?.let { tombstones ->
+                dao.deleteAllTombstones()
                 tombstones.forEach { dao.upsertTombstone(it) }
             }
         }

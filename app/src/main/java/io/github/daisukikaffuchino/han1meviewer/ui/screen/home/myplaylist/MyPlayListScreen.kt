@@ -73,10 +73,6 @@ fun PlaylistScreen(
         viewModel.refreshCompleted.collect { isRefreshing = false }
     }
 
-    LaunchedEffect(Unit) {
-        if (uiState.playlists.isEmpty()) viewModel.loadMyPlayList()
-    }
-
     DisposableEffect(lifecycleOwner, uiState.showSheet) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && uiState.showSheet) {
@@ -87,15 +83,12 @@ fun PlaylistScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(Unit) {
+            LaunchedEffect(Unit) {
         viewModel.createPlaylistFlow.collect { result ->
             when (result) {
                 is WebsiteState.Error -> SonnerToast.error(R.string.add_failed)
                 is WebsiteState.Loading -> Unit
-                is WebsiteState.Success -> {
-                    SonnerToast.success(R.string.add_success)
-                    viewModel.loadMyPlayList()
-                }
+                is WebsiteState.Success -> SonnerToast.success(R.string.add_success)
             }
         }
     }
@@ -105,9 +98,9 @@ fun PlaylistScreen(
             PlaylistEvent.OnBack -> navigateBack()
             PlaylistEvent.OnRefresh -> {
                 isRefreshing = true
-                viewModel.loadMyPlayList(forceReload = true)
+                viewModel.refresh()
             }
-            PlaylistEvent.OnLoadMore -> viewModel.loadMyPlayList(viewModel.playlistPage + 1)
+            PlaylistEvent.OnLoadMore -> Unit
             is PlaylistEvent.OnPlaylistClick -> {
                 viewModel.setShowSheet(true)
                 viewModel.setListInfo(event.listCode, event.title)
@@ -115,7 +108,6 @@ fun PlaylistScreen(
             PlaylistEvent.OnDismissSheet -> {
                 temporarilyHideSheetForNavigation = false
                 viewModel.setShowSheet(false)
-                viewModel.currentPage = 1
                 viewModel.clearCurrentList()
             }
             is PlaylistEvent.OnCreatePlaylist -> viewModel.createPlaylist(event.title, event.desc)

@@ -177,12 +177,10 @@ fun PlaylistBottomSheet(
                         sheetState.hide()
                         onDismiss()
                         SonnerToast.success(R.string.delete_success)
-                        vm.loadMyPlayList()
                         return@collect
                     }
                     SonnerToast.success(R.string.modify_success)
                     vm.getPlaylistItems(1, currentCode, true)
-                    vm.loadMyPlayList()
                 }
             }
         }
@@ -193,10 +191,7 @@ fun PlaylistBottomSheet(
             when (result) {
                 is WebsiteState.Error -> SonnerToast.error(R.string.delete_failed)
                 is WebsiteState.Loading -> {}
-                is WebsiteState.Success -> {
-                    SonnerToast.success(R.string.delete_success)
-                    vm.loadMyPlayList()
-                }
+                is WebsiteState.Success -> SonnerToast.success(R.string.delete_success)
             }
         }
     }
@@ -338,38 +333,6 @@ private fun PlaylistSheetContent(
                         showDeleteContextAction = true,
                     )
                 }
-
-                item(span = { GridItemSpan(columns) }) {
-                    if (playlistState is PageLoadingState.Loading && viewModel.currentPage > 1) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                }
-
-                if (playlistState is PageLoadingState.NoMoreData && playlist.isNotEmpty()) {
-                    item(span = { GridItemSpan(columns) }) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                stringResource(
-                                    R.string.load_complete_with_pages,
-                                    viewModel.currentPage - 1
-                                ),
-                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            )
-                        }
-                    }
-                }
             }
 
             LaunchedEffect(gridState, playlistState) {
@@ -378,11 +341,9 @@ private fun PlaylistSheetContent(
                     val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                     if (lastVisibleItem >= totalItems - 3 &&
                         playlistState !is PageLoadingState.Loading &&
-                        playlistState !is PageLoadingState.NoMoreData &&
-                        !viewModel.isLoadingMore
+                        playlistState !is PageLoadingState.NoMoreData
                     ) {
-                        viewModel.currentPage++
-                        viewModel.getPlaylistItems(viewModel.currentPage, listCode)
+                        viewModel.getPlaylistItems(1, listCode)
                     }
                 }
             }

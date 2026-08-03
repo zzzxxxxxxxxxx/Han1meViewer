@@ -19,7 +19,6 @@ import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.HKeyframeEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.WatchHistoryEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.HanimeDownloadEntity
-import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
@@ -300,16 +299,7 @@ class VideoViewModel(
         viewModelScope.launch {
             val video = _hanimeVideoFlow.value
             val local = DatabaseRepo.LocalMylist.findBy(videoCode)
-            val base = local ?: LocalVideoEntity(
-                videoCode = videoCode,
-                title = video?.title.orEmpty(),
-                coverUrl = video?.coverUrl.orEmpty(),
-                duration = video?.views,
-                views = video?.views,
-                reviews = video?.ratingCount?.toString(),
-                currentArtist = video?.artist?.name,
-                uploadTime = video?.uploadTime?.toString(),
-            )
+            val base = local ?: LocalVideoEntity.fromVideo(videoCode, video)
             DatabaseRepo.LocalMylist.upsertVideo(
                 base.copy(
                     isFav = newFav,
@@ -330,36 +320,17 @@ class VideoViewModel(
                     }
                     // 云端删除失败时记录墓碑，登录同步时补偿，避免被云端数据「复活」
                     if (likeStatus && state is WebsiteState.Error) {
-                        upsertTombstone(videoCode, isFav = true)
+                        DatabaseRepo.LocalMylist.upsertTombstoneMerged(videoCode, isFav = true)
                     }
                 }
             } else {
                 // 未登录的取消收藏：记录墓碑，登录后推送到云端删除
                 if (likeStatus) {
-                    upsertTombstone(videoCode, isFav = true)
+                    DatabaseRepo.LocalMylist.upsertTombstoneMerged(videoCode, isFav = true)
                 }
                 _addToFavVideoFlow.emit(WebsiteState.Success(true))
             }
         }
-    }
-
-    private suspend fun upsertTombstone(
-        videoCode: String,
-        isFav: Boolean = false,
-        isWatchLater: Boolean = false,
-    ) {
-        val existing = DatabaseRepo.LocalMylist.findTombstone(videoCode)
-        DatabaseRepo.LocalMylist.upsertTombstone(
-            existing?.copy(
-                isFav = existing.isFav || isFav,
-                isWatchLater = existing.isWatchLater || isWatchLater,
-            ) ?: LocalMylistTombstoneEntity(
-                videoCode = videoCode,
-                isFav = isFav,
-                isWatchLater = isWatchLater,
-                deletedTime = System.currentTimeMillis(),
-            )
-        )
     }
 
     fun rateVideo(video: HanimeVideo, isPositive: Boolean) {
@@ -401,14 +372,8 @@ class VideoViewModel(
         viewModelScope.launch {
             val video = _hanimeVideoFlow.value
             val local = DatabaseRepo.LocalMylist.findBy(videoCode)
-            if (listCode == "save") {
-                val base = local ?: LocalVideoEntity(
-                    videoCode = videoCode,
-                    title = video?.title.orEmpty(),
-                    coverUrl = video?.coverUrl.orEmpty(),
-                    views = video?.views,
-                    currentArtist = video?.artist?.name,
-                )
+            if (listCode == HanimeVideo.MyList.SAVE_CODE) {
+                val base = local ?: LocalVideoEntity.fromVideo(videoCode, video)
                 DatabaseRepo.LocalMylist.upsertVideo(
                     base.copy(
                         isWatchLater = isChecked,
@@ -428,12 +393,12 @@ class VideoViewModel(
                             )
                         }
                         if (!isChecked && state is WebsiteState.Error) {
-                            upsertTombstone(videoCode, isWatchLater = true)
+                            DatabaseRepo.LocalMylist.upsertTombstoneMerged(videoCode, isWatchLater = true)
                         }
                     }
                 } else {
                     if (!isChecked) {
-                        upsertTombstone(videoCode, isWatchLater = true)
+                        DatabaseRepo.LocalMylist.upsertTombstoneMerged(videoCode, isWatchLater = true)
                     }
                     _modifyMyListFlow.emit(WebsiteState.Success(position))
                 }
@@ -510,7 +475,8 @@ class VideoViewModel(
      * 未登录时（服务端没有可用的 myList 数据）完全用本地数据库构造清单列表；
      * 已登录时保留服务端清单数据，仅合并本地稍后观看标志。
      */
-    private suspend fun applyLocalMylistState(code: String) {        val local = DatabaseRepo.LocalMylist.findBy(code)
+    private suspend fun applyLocalMylistState(code: String) {
+        val local = DatabaseRepo.LocalMylist.findBy(code)
         _hanimeVideoFlow.update { prev ->
             prev ?: return@update null
             val myList = if (SettingsRepository.isAlreadyLogin) {
@@ -545,8 +511,8 @@ class VideoViewModel(
         return HanimeVideo.MyList(
             isWatchLater = local?.isWatchLater ?: false,
             myListInfo = savedInLists + HanimeVideo.MyList.MyListInfo(
-                code = "save",
-                title = "save",
+                code = HanimeVideo.MyList.SAVE_CODE,
+                title = HanimeVideo.MyList.SAVE_CODE,
                 isSelected = local?.isWatchLater ?: false,
             ),
         )
