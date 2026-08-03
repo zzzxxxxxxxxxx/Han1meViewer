@@ -127,10 +127,12 @@ class MyPlayListViewModel : ViewModel() {
         DatabaseRepo.LocalMylist.observePlaylists().flatMapLatest { playlists ->
             flow {
                 emit(playlists.map { playlist ->
+                    val items = DatabaseRepo.LocalMylist.getPlaylistItems(playlist.code)
                     Playlists.Playlist(
                         listCode = playlist.code,
                         title = playlist.name,
-                        total = DatabaseRepo.LocalMylist.getPlaylistItems(playlist.code).size,
+                        total = items.size,
+                        coverUrl = items.firstOrNull()?.coverUrl,
                     )
                 })
             }

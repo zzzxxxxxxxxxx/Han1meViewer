@@ -495,18 +495,30 @@ class VideoViewModel(
     }
 
     /**
-     * 视频加载成功后，用本地数据合并收藏 / 稍后观看状态。
-     * 未登录时（服务端没有 myList 数据）从本地数据库构造清单列表。
+     * 重新用本地数据刷新当前视频的收藏 / 稍后观看 / 清单勾选状态。
+     * 打开「加入播放清单」弹层前调用，避免清单列表过期。
      */
-    private suspend fun applyLocalMylistState(code: String) {
-        val local = DatabaseRepo.LocalMylist.findBy(code)
+    fun refreshLocalMyList() {
+        if (videoCode.isBlank()) return
+        viewModelScope.launch {
+            applyLocalMylistState(videoCode)
+        }
+    }
+
+    /**
+     * 视频加载成功后，用本地数据合并收藏 / 稍后观看状态。
+     * 未登录时（服务端没有可用的 myList 数据）完全用本地数据库构造清单列表；
+     * 已登录时保留服务端清单数据，仅合并本地稍后观看标志。
+     */
+    private suspend fun applyLocalMylistState(code: String) {        val local = DatabaseRepo.LocalMylist.findBy(code)
         _hanimeVideoFlow.update { prev ->
             prev ?: return@update null
-            val myList = when {
-                prev.myList != null -> prev.myList.copy(
+            val myList = if (SettingsRepository.isAlreadyLogin) {
+                prev.myList?.copy(
                     isWatchLater = prev.myList.isWatchLater || (local?.isWatchLater == true)
-                )
-                else -> buildLocalMyList(code, local)
+                ) ?: buildLocalMyList(code, local)
+            } else {
+                buildLocalMyList(code, local)
             }
             prev.copy(
                 isFav = prev.isFav || (local?.isFav == true),

@@ -329,10 +329,12 @@ private fun PlaylistSheetContent(
                     VideoCardItem(
                         videoItem = item,
                         isHorizontalCard = true,
-                        onClickVideosItem = onClickItem
-                    ) { videoCode, _ ->
-                        showDeleteItemConfirm = Triple(listCode, videoCode, index)
-                    }
+                        onClickVideosItem = onClickItem,
+                        onLongClickVideosItem = { _, videoCode ->
+                            showDeleteItemConfirm = Triple(listCode, videoCode, index)
+                        },
+                        showDeleteContextAction = true,
+                    )
                 }
 
                 item(span = { GridItemSpan(columns) }) {

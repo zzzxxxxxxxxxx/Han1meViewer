@@ -87,6 +87,7 @@ fun RenderVideoIntroductionContent(
             onManageMyList = { _, selectedStates ->
                 onManageMyList(video?.myList, selectedStates)
             },
+            onRefreshMyListState = { viewModel.refreshLocalMyList() },
             checkInEnabled = checkInEnabled,
             onQuickCheckIn = onQuickCheckIn,
             onPrepareDownload = { quality ->

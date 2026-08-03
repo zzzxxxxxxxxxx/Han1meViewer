@@ -132,6 +132,7 @@ fun VideoIntroductionScreen(
     onToggleFavorite: () -> Unit,
     onRateVideo: (Boolean) -> Unit,
     onManageMyList: (List<String>, List<Boolean>) -> Unit,
+    onRefreshMyListState: () -> Unit = {},
     checkInEnabled: Boolean,
     onQuickCheckIn: (CheckInRecordEntity) -> Unit,
     onPrepareDownload: (String) -> Unit,
@@ -172,6 +173,7 @@ fun VideoIntroductionScreen(
                 onToggleFavorite = onToggleFavorite,
                 onRateVideo = onRateVideo,
                 onManageMyList = onManageMyList,
+                onRefreshMyListState = onRefreshMyListState,
                 checkInEnabled = checkInEnabled,
                 onQuickCheckIn = onQuickCheckIn,
                 onPrepareDownload = onPrepareDownload,
@@ -224,6 +226,7 @@ private fun VideoIntroductionContent(
     onToggleFavorite: () -> Unit,
     onRateVideo: (Boolean) -> Unit,
     onManageMyList: (List<String>, List<Boolean>) -> Unit,
+    onRefreshMyListState: () -> Unit = {},
     checkInEnabled: Boolean,
     onQuickCheckIn: (CheckInRecordEntity) -> Unit,
     onPrepareDownload: (String) -> Unit,
@@ -386,7 +389,10 @@ private fun VideoIntroductionContent(
                         onQuickCheckIn = { showQuickCheckInDialog = true },
                         onOpenOriginalComic = onOpenOriginalComic,
                         onToggleFavorite = onToggleFavorite,
-                        onManageMyList = { showMyListDialog = true },
+                        onManageMyList = {
+                            onRefreshMyListState()
+                            showMyListDialog = true
+                        },
                         onDownload = { showDownloadQualityDialog = true },
                         onShare = onShare,
                         onCopyShareText = onCopyShareText,

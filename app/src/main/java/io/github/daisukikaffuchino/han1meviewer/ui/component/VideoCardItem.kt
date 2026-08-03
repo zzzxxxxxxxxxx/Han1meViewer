@@ -79,6 +79,7 @@ fun VideoCardItem(
     containerColor: Color? = null,
     onClickVideosItem: (String) -> Unit,
     onLongClickVideosItem: (String, String) -> Unit,
+    showDeleteContextAction: Boolean = false,
 ) {
     val textFontSize = dimensionResource(id = R.dimen.video_view_and_time_and_duration).value.sp
     val iconSize = dimensionResource(id = R.dimen.view_view_and_time_icon_size)
@@ -327,6 +328,15 @@ fun VideoCardItem(
                             (context as? MainActivity)?.mainBackStack?.add(
                                 SearchRoute(query = currentArtist)
                             )
+                        },
+                    )
+                }
+                if (showDeleteContextAction) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete)) },
+                        onClick = {
+                            showContextMenu = false
+                            onLongClickVideosItem(videoItem.title, videoItem.videoCode)
                         },
                     )
                 }

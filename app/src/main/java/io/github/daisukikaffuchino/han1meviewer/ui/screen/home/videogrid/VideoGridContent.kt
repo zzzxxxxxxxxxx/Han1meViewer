@@ -50,6 +50,7 @@ fun VideoGridContent(
                 isHorizontalCard = true,
                 onClickVideosItem = { onOpenVideo(item) },
                 onLongClickVideosItem = { _, _ -> onDeleteItem(item) },
+                showDeleteContextAction = true,
             )
         }
         if (uiState.items.isNotEmpty()) {
