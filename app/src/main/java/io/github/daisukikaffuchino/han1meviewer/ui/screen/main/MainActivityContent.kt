@@ -7,10 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -72,7 +76,7 @@ fun MainActivityContent(
     onDismissSiteSwitch: () -> Unit,
     onConfirmSiteSwitch: () -> Unit,
     onDismissLogout: () -> Unit,
-    onConfirmLogout: () -> Unit,
+    onConfirmLogout: (Boolean) -> Unit,
     onOpenClipboardVideo: (String) -> Unit,
 ) {
     val backStack = viewModel.mainBackStack
@@ -96,6 +100,7 @@ fun MainActivityContent(
         )
     }
     var sourceLink by rememberSaveable { mutableStateOf("") }
+    var clearLocalMylistOnLogout by remember { mutableStateOf(false) }
     var appAccessGranted by remember {
         mutableStateOf(SettingsRepository.usageNoticeAccepted && SettingsRepository.usageSourceVerified)
     }
@@ -326,8 +331,35 @@ fun MainActivityContent(
         message = "",
         confirmText = stringResource(R.string.sure),
         dismissText = stringResource(R.string.no),
-        onConfirm = onConfirmLogout,
-        onDismiss = onDismissLogout,
+        onConfirm = {
+            onConfirmLogout(clearLocalMylistOnLogout)
+            clearLocalMylistOnLogout = false
+        },
+        onDismiss = {
+            clearLocalMylistOnLogout = false
+            onDismissLogout()
+        },
+        content = {
+            if (SettingsRepository.isLocalMylistEnabled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .toggleable(
+                            value = clearLocalMylistOnLogout,
+                            onValueChange = { clearLocalMylistOnLogout = it },
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = clearLocalMylistOnLogout,
+                        onCheckedChange = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.logout_clear_local_data))
+                }
+            }
+        },
     )
     ConfirmDialog(
         visible = showStorageSwitchNotice,

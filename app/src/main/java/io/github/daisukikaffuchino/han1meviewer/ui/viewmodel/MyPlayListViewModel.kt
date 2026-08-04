@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -42,9 +43,10 @@ data class PlaylistSheetScrollState(
 /**
  * 播放清单 ViewModel。
  *
- * 数据源统一为本地数据库（mylist.db），登录时由路由层触发 [MylistSyncManager.sync]
- * 与云端双向合并，本地数据库更新后页面自动刷新。操作函数在未登录时只写本地，
- * 已登录时同时调用云端并写本地镜像。
+ * 双模式：
+ * - 本地化模式（已登录且开启实验性开关）：数据源为本地数据库（mylist.db），
+ *   由路由层触发 [MylistSyncManager.sync] 与云端双向合并，数据库更新后页面自动刷新
+ * - 在线模式（默认）：数据来自云端（NetworkRepo），与上游行为一致
  *
  * @project Han1meViewer
  */
@@ -73,6 +75,11 @@ class MyPlayListViewModel : ViewModel() {
     val refreshCompleted: SharedFlow<Unit> = _refreshCompleted
 
     private val _showSheet = MutableStateFlow(false)
+    var currentPage = 1
+    var isLoadingMore = false
+        private set
+
+    var playlistPage = 1
     private val _isLoadingMorePlaylists = MutableStateFlow(false)
     private val _noMorePlaylists = MutableStateFlow(false)
 
@@ -97,15 +104,34 @@ class MyPlayListViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            observeLocalPlaylists().onEach { playlists ->
-                _cachedMyPlayList.value = playlists
-                _myPlaylistsFlow.value = WebsiteState.Success(Playlists(playlists))
-                _isLoadingMorePlaylists.value = false
-                _noMorePlaylists.value = true
-                runCatching { _refreshCompleted.emit(Unit) }
+            SettingsRepository.settings.flatMapLatest { settings ->
+                if (settings.enableLocalMylist) {
+                    observeLocalPlaylists().onEach { playlists ->
+                        _cachedMyPlayList.value = playlists
+                        _myPlaylistsFlow.value = WebsiteState.Success(Playlists(playlists))
+                        _isLoadingMorePlaylists.value = false
+                        _noMorePlaylists.value = true
+                        runCatching { _refreshCompleted.emit(Unit) }
+                    }.map { Unit }
+                } else {
+                    _cachedMyPlayList.value = emptyList()
+                    _myPlaylistsFlow.value = WebsiteState.Loading
+                    loadMyPlayList(1, forceReload = true)
+                    flow {
+                        emit(Unit)
+                    }
+                }
             }.collect()
         }
     }
+
+    /**
+     * 本地化数据源判断：仅由实验性开关控制。
+     * 开关开启时列表页 / 操作统一走本地数据库（未登录直接本地，登录后由
+     * 同步引擎合并云端）；开关关闭时为纯在线模式（仅登录用户可达，未登录被路由门禁拦截）。
+     */
+    private fun useLocalMode() =
+        SettingsRepository.isLocalMylistEnabled
 
     private fun observeLocalPlaylists() =
         DatabaseRepo.LocalMylist.observePlaylists().flatMapLatest { playlists ->
@@ -123,13 +149,14 @@ class MyPlayListViewModel : ViewModel() {
         }
 
     /**
-     * 下拉刷新：已登录时触发云端同步（本地数据库更新后列表自动刷新），
-     * 未登录时本地数据已是实时，仅结束刷新指示器。
+     * 下拉刷新：本地化模式触发云端同步（数据库更新后列表自动刷新），
+     * 在线模式重新加载云端数据，未登录本地模式仅结束刷新指示器。
      */
     fun refresh() {
         viewModelScope.launch {
-            if (SettingsRepository.isAlreadyLogin) {
-                MylistSyncManager.sync()
+            when {
+                useLocalMode() -> MylistSyncManager.sync()
+                SettingsRepository.isAlreadyLogin -> loadMyPlayList(1, forceReload = true)
             }
             runCatching { _refreshCompleted.emit(Unit) }
         }
@@ -162,21 +189,113 @@ class MyPlayListViewModel : ViewModel() {
         return _playlistSheetScrollStates.value[listCode] ?: PlaylistSheetScrollState()
     }
 
-    // 获取单个playlist内容（本地数据源，随数据库变化自动刷新）
-    fun getPlaylistItems(page: Int = 1, listCode: String, refresh: Boolean = false) {
-        localItemsJob?.cancel()
-        localItemsJob = viewModelScope.launch {
-            if (listCode.isBlank()) return@launch
-            DatabaseRepo.LocalMylist.observePlaylistItems(listCode).collect { items ->
-                val hanimeInfos = items.map { it.toHanimeInfo() }
-                _playlistDesc.value = DatabaseRepo.LocalMylist.findPlaylist(listCode)?.description
-                _playlistFlow.value = hanimeInfos
-                _playlistStateFlow.value = if (hanimeInfos.isEmpty()) {
-                    PageLoadingState.NoMoreData
-                } else {
-                    PageLoadingState.Success(MyListItems(hanimeInfos))
+    // 加载所有playlist（仅在线模式；本地化模式由 Room 流驱动）
+    fun loadMyPlayList(page: Int = 1, forceReload: Boolean = false) {
+        if (useLocalMode()) return
+        if (page > 1 && (_isLoadingMorePlaylists.value || _noMorePlaylists.value)) return
+        if (page == 1 || forceReload) {
+            playlistPage = 1
+            _noMorePlaylists.value = false
+        }
+        if (page > 1) {
+            _isLoadingMorePlaylists.value = true
+        }
+        val userId = SettingsRepository.savedUserId
+        viewModelScope.launch {
+            NetworkRepo.getPlaylists(page, userId).collect { state ->
+                when (state) {
+                    is WebsiteState.Loading -> {
+                        if (page == 1 || forceReload) {
+                            _myPlaylistsFlow.value = state
+                        }
+                    }
+                    is WebsiteState.Error -> {
+                        _myPlaylistsFlow.value = state
+                        _isLoadingMorePlaylists.value = false
+                    }
+                    is WebsiteState.Success -> {
+                        val newList = state.info.playlists
+                        if (page == 1 || forceReload) {
+                            _cachedMyPlayList.value = newList
+                        } else {
+                            _cachedMyPlayList.value = (_cachedMyPlayList.value + newList)
+                                .distinctBy(Playlists.Playlist::listCode)
+                            playlistPage = page
+                        }
+                        if (newList.isEmpty()) {
+                            _noMorePlaylists.value = true
+                        }
+                        _myPlaylistsFlow.value = state
+                        _isLoadingMorePlaylists.value = false
+                        _refreshCompleted.emit(Unit)
+                    }
                 }
             }
+        }
+    }
+
+    // 获取单个playlist内容
+    fun getPlaylistItems(page: Int = 1, listCode: String, refresh: Boolean = false) {
+        if (useLocalMode()) {
+            localItemsJob?.cancel()
+            localItemsJob = viewModelScope.launch {
+                if (listCode.isBlank()) return@launch
+                DatabaseRepo.LocalMylist.observePlaylistItems(listCode).collect { items ->
+                    val hanimeInfos = items.map { it.toHanimeInfo() }
+                    _playlistDesc.value = DatabaseRepo.LocalMylist.findPlaylist(listCode)?.description
+                    _playlistFlow.value = hanimeInfos
+                    _playlistStateFlow.value = if (hanimeInfos.isEmpty()) {
+                        PageLoadingState.NoMoreData
+                    } else {
+                        PageLoadingState.Success(MyListItems(hanimeInfos))
+                    }
+                }
+            }
+            return
+        }
+        if (isLoadingMore) return
+        isLoadingMore = true
+        viewModelScope.launch {
+            if (listCode.isBlank()) return@launch
+            if (page == 1 || refresh) {
+                _playlistFlow.value = emptyList()
+                _playlistDesc.value = null
+                _playlistStateFlow.value = PageLoadingState.Loading
+            } else {
+                _playlistStateFlow.value = PageLoadingState.Loading
+            }
+            NetworkRepo.getMyPlayListItems(page, listCode).collect { state ->
+                when (state) {
+                    is PageLoadingState.Success -> {
+                        _playlistDesc.value = state.info.desc
+                        val newList = state.info.hanimeInfo
+                        if (newList.isEmpty()) {
+                            _playlistStateFlow.value = PageLoadingState.NoMoreData
+                        } else {
+                            _playlistFlow.update { prevList ->
+                                val baseList = if (page == 1 || refresh) emptyList() else prevList
+                                (baseList + newList).distinctBy(HanimeInfo::videoCode)
+                            }
+                            _playlistStateFlow.value = PageLoadingState.Success(state.info)
+                        }
+                    }
+
+                    is PageLoadingState.Error -> {
+                        _playlistStateFlow.value = PageLoadingState.Error(state.throwable)
+                    }
+
+                    is PageLoadingState.Loading -> {
+                        if (page == 1 || refresh) {
+                            _playlistFlow.value = emptyList()
+                        }
+                    }
+
+                    is PageLoadingState.NoMoreData -> {
+                        _playlistStateFlow.value = PageLoadingState.NoMoreData
+                    }
+                }
+            }
+            isLoadingMore = false
         }
     }
 
@@ -187,7 +306,7 @@ class MyPlayListViewModel : ViewModel() {
     // 从详情页删除某视频
     fun deleteFromPlaylist(listCode: String, videoCode: String, position: Int) {
         viewModelScope.launch {
-            if (!SettingsRepository.isAlreadyLogin) {
+            if (useLocalMode()) {
                 val item = DatabaseRepo.LocalMylist
                     .getPlaylistItemCodes(listCode, listOf(videoCode))
                     .firstOrNull()
@@ -229,7 +348,7 @@ class MyPlayListViewModel : ViewModel() {
     // 编辑Playlist
     fun modifyPlaylist(listCode: String, title: String, desc: String, delete: Boolean) {
         viewModelScope.launch {
-            if (!SettingsRepository.isAlreadyLogin) {
+            if (useLocalMode()) {
                 if (delete) {
                     // 已同步的清单记录墓碑，登录同步时推送到云端删除，避免拉取复活
                     DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { playlist ->
@@ -289,7 +408,7 @@ class MyPlayListViewModel : ViewModel() {
     //创建Playlist
     fun createPlaylist(title: String, description: String) {
         viewModelScope.launch {
-            if (!SettingsRepository.isAlreadyLogin) {
+            if (useLocalMode()) {
                 DatabaseRepo.LocalMylist.upsertPlaylist(
                     LocalPlaylistEntity(
                         code = UUID.randomUUID().toString(),

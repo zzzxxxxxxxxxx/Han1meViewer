@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="enable_local_mylist">启用本地化收藏</string>
+    <string name="enable_local_mylist_summary">实验性功能：未登录也可使用收藏、稍后观看、播放清单，登录后与云端双向同步。可能出现问题，欢迎到 GitHub Issues 反馈。</string>
+
+    <string name="clear_local_mylist_data">清除本地收藏数据</string>
+    <string name="clear_and_resync_local_mylist">清除本地数据并重新同步</string>
+    <string name="clear_local_mylist_summary">清除本机存储的收藏、稍后观看、播放清单（不影响云端数据）</string>
+    <string name="clear_local_mylist_confirm">未同步到云端的本地数据将丢失，确认清除？</string>
+    <string name="clear_local_mylist_success">已清除</string>
+
+    <string name="logout_clear_local_data">同时清除本地收藏、稍后观看、播放清单数据</string>
+
+    <string name="login_required">需要登录</string>
+    <string name="local_mylist_gate_message">该功能需要登录，也可在设置中开启实验性本地化功能。</string>
+    <string name="local_mylist_operation_gate">请先登录，或在设置中开启本地化功能。</string>
+    <string name="go_to_login">去登录</string>
+</resources>

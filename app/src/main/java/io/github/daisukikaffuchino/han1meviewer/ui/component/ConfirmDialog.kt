@@ -15,6 +15,7 @@ import io.github.daisukikaffuchino.han1meviewer.ui.preview.ComponentPreview
  * @param visible 是否显示对话框
  * @param title 标题文本
  * @param message 内容文本
+ * @param content 可选的自定义内容（显示在 message 下方，如复选框）
  * @param confirmText 确认按钮文本
  * @param dismissText 取消按钮文本
  * @param onConfirm 确认回调
@@ -31,13 +32,21 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     cancelable: Boolean = true,
+    content: (@Composable () -> Unit)? = null,
 ) {
     if (!visible) return
 
     AlertDialog(
         onDismissRequest = { if (cancelable) onDismiss() },
         title = { Text(text = title) },
-        text = { Text(text = message) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                if (message.isNotBlank()) {
+                    Text(text = message)
+                }
+                content?.invoke()
+            }
+        },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(confirmText)

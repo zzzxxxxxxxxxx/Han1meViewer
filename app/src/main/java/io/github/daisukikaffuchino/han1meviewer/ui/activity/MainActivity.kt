@@ -25,6 +25,7 @@ import androidx.lifecycle.lifecycleScope
 import io.github.daisukikaffuchino.han1meviewer.HanimeConstants.ANIME_URL
 import io.github.daisukikaffuchino.han1meviewer.HanimeConstants.HANIME_URL
 import io.github.daisukikaffuchino.han1meviewer.BuildConfig
+import io.github.daisukikaffuchino.han1meviewer.logic.DatabaseRepo
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.logout
@@ -232,17 +233,20 @@ class MainActivity : BaseActivity() {
         logoutDialogCloseCurrentPage = closeCurrentPageOnConfirm
     }
 
-    private fun confirmLogout() {
+    private fun confirmLogout(clearLocalData: Boolean) {
         val closeCurrentPage = logoutDialogCloseCurrentPage ?: return
         logoutDialogCloseCurrentPage = null
         if (closeCurrentPage) {
             mainBackStack.removeLast()
         }
-        logoutWithRefresh()
+        logoutWithRefresh(clearLocalData)
     }
 
-    fun logoutWithRefresh() {
+    fun logoutWithRefresh(clearLocalData: Boolean = false) {
         lifecycleScope.launch {
+            if (clearLocalData) {
+                runCatching { DatabaseRepo.LocalMylist.clearAll() }
+            }
             logout()
             viewModel.getHomePage()
         }

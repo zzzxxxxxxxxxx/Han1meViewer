@@ -38,6 +38,7 @@ object SettingsRepository : SettingsStore {
     val checkInEnabledFlow by lazy { settings.map { it.checkInEnabled }.stateIn(scope, SharingStarted.Eagerly, current.checkInEnabled) }
 
     val isAlreadyLogin get() = current.isAlreadyLogin
+    val isLocalMylistEnabled get() = current.enableLocalMylist
     val usageNoticeAccepted get() = current.usageNoticeAccepted
     val usageSourceVerified get() = current.usageSourceVerified
     val usageSourcePending get() = current.usageSourcePending

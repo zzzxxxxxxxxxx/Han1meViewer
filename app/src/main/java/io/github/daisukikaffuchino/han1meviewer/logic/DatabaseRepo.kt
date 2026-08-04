@@ -371,5 +371,15 @@ object DatabaseRepo {
         }
 
         //</editor-fold>
+
+        /**
+         * 清空全部本地收藏 / 稍后观看 / 播放清单数据（含墓碑）。
+         */
+        suspend fun clearAll() {
+            dao.deleteAllVideos()
+            dao.deleteAllPlaylists()
+            dao.deleteAllPlaylistItems()
+            dao.deleteAllTombstones()
+        }
     }
 }

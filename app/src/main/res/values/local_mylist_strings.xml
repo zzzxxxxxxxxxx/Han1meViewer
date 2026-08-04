@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="enable_local_mylist">Enable Local Favorites</string>
+    <string name="enable_local_mylist_summary">Experimental feature: use favorites, watch-later and playlists without logging in, with two-way sync when logged in. Issues may occur — please report them at GitHub Issues.</string>
+
+    <string name="clear_local_mylist_data">Clear local favorites data</string>
+    <string name="clear_and_resync_local_mylist">Clear local data and re-sync</string>
+    <string name="clear_local_mylist_summary">Clear favorites / watch-later / playlists stored on this device (cloud data is kept)</string>
+    <string name="clear_local_mylist_confirm">Local data not yet synced to the cloud will be lost. Clear anyway?</string>
+    <string name="clear_local_mylist_success">Cleared</string>
+
+    <string name="logout_clear_local_data">Also clear local favorites / watch-later / playlist data</string>
+
+    <string name="login_required">Login required</string>
+    <string name="local_mylist_gate_message">This feature requires login, or you can enable the experimental local feature in Settings.</string>
+    <string name="local_mylist_operation_gate">Please log in first, or enable the local feature in Settings.</string>
+    <string name="go_to_login">Log in</string>
+</resources>

@@ -19,11 +19,15 @@ fun MyPlaylistRouteScreen(
     onBack: () -> Unit,
     onNavigateToVideo: (String) -> Unit,
 ) {
+    val settings by SettingsRepository.settings.collectAsStateWithLifecycle()
+    if (!settings.isAlreadyLogin && !settings.enableLocalMylist) {
+        LocalMylistGateScreen(onBack = onBack)
+        return
+    }
     val viewModel: MyPlayListViewModel = viewModel()
     val copyTextToClipboard = rememberCopyTextToClipboard()
-    val isLoggedIn by SettingsRepository.loginStateFlow.collectAsStateWithLifecycle()
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) MylistSyncManager.sync()
+    LaunchedEffect(settings.isAlreadyLogin, settings.enableLocalMylist) {
+        if (settings.isAlreadyLogin && settings.enableLocalMylist) MylistSyncManager.sync()
     }
     PlaylistScreen(
         viewModel = viewModel,

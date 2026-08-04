@@ -161,6 +161,7 @@ data class AppSettings(
     val disableMobileDataWarning: Boolean = false,
     val funLoadingHints: Boolean = true,
     val checkInEnabled: Boolean = true,
+    val enableLocalMylist: Boolean = false,
     val searchGridColumnsCompact: Int = 2,
     val searchGridColumnsMedium: Int = 3,
     val searchGridColumnsExpanded: Int = 4,

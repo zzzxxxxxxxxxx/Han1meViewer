@@ -285,10 +285,11 @@ class VideoViewModel(
     ) = modifyFavVideoInternal(videoCode, likeStatus = true, currentUserId)
 
     /**
-     * 收藏 / 取消收藏（本地优先）。
+     * 收藏 / 取消收藏。
      *
-     * 未登录时只写本地（sync 标记为 false，登录后由同步引擎推送云端）；
-     * 已登录时写本地镜像并同步调用云端，云端失败则回滚 sync 标记等待下次同步。
+     * 本地化模式（已登录且开启实验性开关）：本地优先，未登录只写本地、
+     * 已登录写本地镜像并同步云端；
+     * 纯在线模式（开关关闭）：只调用云端，不写本地。
      */
     private fun modifyFavVideoInternal(
         videoCode: String,
@@ -297,6 +298,18 @@ class VideoViewModel(
     ) {
         val newFav = !likeStatus
         viewModelScope.launch {
+            if (!SettingsRepository.isLocalMylistEnabled) {
+                // 纯在线模式：直连云端
+                NetworkRepo.addToMyFavVideo(
+                    videoCode, likeStatus, currentUserId, csrfToken
+                ).collect { state ->
+                    _addToFavVideoFlow.emit(state)
+                    if (state is WebsiteState.Success) {
+                        _hanimeVideoFlow.update { it?.copy(isFav = newFav) }
+                    }
+                }
+                return@launch
+            }
             val video = _hanimeVideoFlow.value
             val local = DatabaseRepo.LocalMylist.findBy(videoCode)
             val base = local ?: LocalVideoEntity.fromVideo(videoCode, video)
@@ -370,6 +383,16 @@ class VideoViewModel(
         position: Int,
     ) {
         viewModelScope.launch {
+            if (!SettingsRepository.isLocalMylistEnabled) {
+                // 纯在线模式：直连云端，成功后更新本地勾选状态显示
+                NetworkRepo.addToMyList(listCode, videoCode, isChecked, position, csrfToken).collect { state ->
+                    _modifyMyListFlow.emit(state)
+                    if (state is WebsiteState.Success) {
+                        updateMyListSelectionUi(listCode, isChecked)
+                    }
+                }
+                return@launch
+            }
             val video = _hanimeVideoFlow.value
             val local = DatabaseRepo.LocalMylist.findBy(videoCode)
             if (listCode == HanimeVideo.MyList.SAVE_CODE) {
@@ -492,10 +515,12 @@ class VideoViewModel(
 
     /**
      * 视频加载成功后，用本地数据合并收藏 / 稍后观看状态。
-     * 未登录时（服务端没有可用的 myList 数据）完全用本地数据库构造清单列表；
-     * 已登录时保留服务端清单数据，仅合并本地稍后观看标志。
+     * 本地化模式（开关开启）：未登录完全用本地数据库构造清单列表，
+     * 已登录保留服务端清单数据并合并本地稍后观看标志；
+     * 纯在线模式（开关关闭）：不注入任何本地数据。
      */
     private suspend fun applyLocalMylistState(code: String) {
+        if (!SettingsRepository.isLocalMylistEnabled) return
         val local = DatabaseRepo.LocalMylist.findBy(code)
         _hanimeVideoFlow.update { prev ->
             prev ?: return@update null

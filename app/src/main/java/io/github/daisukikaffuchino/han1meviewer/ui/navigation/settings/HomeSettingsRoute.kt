@@ -47,6 +47,8 @@ import io.github.daisukikaffuchino.han1meviewer.HanimeConstants
 import io.github.daisukikaffuchino.han1meviewer.HA1_GITHUB_FORUM_URL
 import io.github.daisukikaffuchino.han1meviewer.HA1_GITHUB_ISSUE_URL
 import io.github.daisukikaffuchino.han1meviewer.HanimeApplication
+import io.github.daisukikaffuchino.han1meviewer.logic.DatabaseRepo
+import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.logic.BackupManager
@@ -231,6 +233,18 @@ fun HomeSettingsRouteScreen(
             coroutineScope.launch {
                 SettingsRepository.setCheckInEnabled(it)
                 CheckInWidget().updateAll(context)
+            }
+        },
+        onEnableLocalMylistChange = {
+            coroutineScope.launch { SettingsRepository.update { settings -> settings.copy(enableLocalMylist = it) } }
+        },
+        onClearLocalMylistData = {
+            coroutineScope.launch {
+                DatabaseRepo.LocalMylist.clearAll()
+                if (SettingsRepository.isAlreadyLogin) {
+                    MylistSyncManager.sync()
+                }
+                SonnerToast.success(R.string.clear_local_mylist_success)
             }
         },
         onDisableCommentsChange = {
@@ -532,6 +546,8 @@ private fun buildHomeSettingsUiState(
         horizontalCardCountSummary = "${horizontalCardCountConfig.narrowCount}~${horizontalCardCountConfig.expandedCount}",
         horizontalCardCountConfig = horizontalCardCountConfig,
         checkInEnabled = SettingsRepository.isCheckInEnabled,
+        enableLocalMylist = SettingsRepository.isLocalMylistEnabled,
+        isAlreadyLogin = SettingsRepository.isAlreadyLogin,
         homeCategoryItems = defaultHomeCategoryPreferenceItems,
         homeCategoryOrder = homeCategoryOrder,
         hiddenHomeCategoryKeys = hiddenHomeCategoryKeys,

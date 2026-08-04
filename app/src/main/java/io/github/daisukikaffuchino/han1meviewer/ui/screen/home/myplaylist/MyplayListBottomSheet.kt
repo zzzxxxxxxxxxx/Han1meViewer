@@ -334,6 +334,38 @@ private fun PlaylistSheetContent(
                         showDeleteContextAction = true,
                     )
                 }
+
+                item(span = { GridItemSpan(columns) }) {
+                    if (playlistState is PageLoadingState.Loading && viewModel.currentPage > 1) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+
+                if (playlistState is PageLoadingState.NoMoreData && playlist.isNotEmpty()) {
+                    item(span = { GridItemSpan(columns) }) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.load_complete_with_pages,
+                                    viewModel.currentPage - 1
+                                ),
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                        }
+                    }
+                }
             }
 
             LaunchedEffect(gridState, playlistState) {
@@ -342,9 +374,11 @@ private fun PlaylistSheetContent(
                     val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                     if (lastVisibleItem >= totalItems - 3 &&
                         playlistState !is PageLoadingState.Loading &&
-                        playlistState !is PageLoadingState.NoMoreData
+                        playlistState !is PageLoadingState.NoMoreData &&
+                        !viewModel.isLoadingMore
                     ) {
-                        viewModel.getPlaylistItems(1, listCode)
+                        viewModel.currentPage++
+                        viewModel.getPlaylistItems(viewModel.currentPage, listCode)
                     }
                 }
             }

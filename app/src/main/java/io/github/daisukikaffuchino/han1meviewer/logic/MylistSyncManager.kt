@@ -33,7 +33,7 @@ object MylistSyncManager {
 
     /**
      * 执行双向合并。登录成功后或打开列表界面时调用，
-     * 未登录或正在同步中直接返回，失败不影响调用方。
+     * 未登录、未开启本地化功能或正在同步中直接返回，失败不影响调用方。
      *
      * 顺序统一为「先推后拉」：墓碑 → 本地脏数据推送 → 云端拉取合并。
      */
@@ -42,6 +42,7 @@ object MylistSyncManager {
         isSyncing = true
         try {
             if (!SettingsRepository.isAlreadyLogin) return
+            if (!SettingsRepository.isLocalMylistEnabled) return
             val userId = SettingsRepository.savedUserId
             if (userId.isBlank()) return
             val token = obtainCsrfToken() ?: return

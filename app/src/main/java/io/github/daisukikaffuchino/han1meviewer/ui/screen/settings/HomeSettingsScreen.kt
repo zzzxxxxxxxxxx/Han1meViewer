@@ -25,6 +25,7 @@ import io.github.daisukikaffuchino.han1meviewer.HA1_GITHUB_URL
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.SearchGridColumnsConfig
 import io.github.daisukikaffuchino.han1meviewer.ui.component.ChoiceDialog
+import io.github.daisukikaffuchino.han1meviewer.ui.component.ConfirmDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.component.SettingInfoItem
 import io.github.daisukikaffuchino.han1meviewer.ui.component.SettingNavigationItem
 import io.github.daisukikaffuchino.han1meviewer.ui.component.SettingSwitchItem
@@ -77,6 +78,8 @@ fun HomeSettingsScreen(
     onTabletModeChange: (Boolean) -> Unit,
     onVideoLandscapeLayoutStyleChange: (String) -> Unit,
     onCheckInEnabledChange: (Boolean) -> Unit,
+    onEnableLocalMylistChange: (Boolean) -> Unit,
+    onClearLocalMylistData: () -> Unit,
     onDisableCommentsChange: (Boolean) -> Unit,
     onCollapseDownloadedGroupChange: (Boolean) -> Unit,
     onSearchGridColumnsConfigChange: (SearchGridColumnsConfig) -> Unit,
@@ -105,6 +108,7 @@ fun HomeSettingsScreen(
     var showHorizontalCardCountDialog by rememberSaveable { mutableStateOf(false) }
     var showHomeCategoryDialog by rememberSaveable { mutableStateOf(false) }
     var showUsageTerms by rememberSaveable { mutableStateOf(false) }
+    var showClearLocalMylistDialog by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
     ChoiceDialog(
@@ -158,6 +162,25 @@ fun HomeSettingsScreen(
             activeDialog = null
             onDisplayDensityChange(value.toInt())
         },
+    )
+
+    ConfirmDialog(
+        visible = showClearLocalMylistDialog,
+        title = stringResource(
+            if (state.isAlreadyLogin) {
+                R.string.clear_and_resync_local_mylist
+            } else {
+                R.string.clear_local_mylist_data
+            }
+        ),
+        message = stringResource(R.string.clear_local_mylist_confirm),
+        confirmText = stringResource(R.string.sure),
+        dismissText = stringResource(R.string.no),
+        onConfirm = {
+            showClearLocalMylistDialog = false
+            onClearLocalMylistData()
+        },
+        onDismiss = { showClearLocalMylistDialog = false },
     )
 
     if (showSearchGridColumnsDialog) {
@@ -454,6 +477,27 @@ fun HomeSettingsScreen(
                 }
                 item {
                     SettingsSection(stringResource(R.string.settings_data)) {
+                        SettingSwitchItem(
+                            title = stringResource(R.string.enable_local_mylist),
+                            summary = stringResource(R.string.enable_local_mylist_summary),
+                            checked = state.enableLocalMylist,
+                            iconRes = R.drawable.ic_favorite_border,
+                            onCheckedChange = onEnableLocalMylistChange,
+                        )
+                        if (state.enableLocalMylist) {
+                            SettingNavigationItem(
+                                title = stringResource(
+                                    if (state.isAlreadyLogin) {
+                                        R.string.clear_and_resync_local_mylist
+                                    } else {
+                                        R.string.clear_local_mylist_data
+                                    }
+                                ),
+                                summary = stringResource(R.string.clear_local_mylist_summary),
+                                iconRes = R.drawable.ic_delete,
+                                onClick = { showClearLocalMylistDialog = true },
+                            )
+                        }
                         SettingNavigationItem(
                             title = stringResource(R.string.backup_export_title),
                             summary = stringResource(R.string.backup_export_summary),
@@ -602,6 +646,8 @@ private fun HomeSettingsScreenPreview() {
             onTabletModeChange = {},
             onVideoLandscapeLayoutStyleChange = {},
             onCheckInEnabledChange = {},
+            onEnableLocalMylistChange = {},
+            onClearLocalMylistData = {},
             onDisableCommentsChange = {},
             onCollapseDownloadedGroupChange = {},
             onSearchGridColumnsConfigChange = {},
@@ -667,4 +713,6 @@ private fun previewHomeSettingsState() = HomeSettingsUiState(
     useAvHomeCategoryTitles = false,
     alwaysShowUpdateCard = false,
     displayDensityPercent = 100,
+    enableLocalMylist = false,
+    isAlreadyLogin = false,
 )
