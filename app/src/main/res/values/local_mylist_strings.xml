@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="backup_import_push_to_cloud">Push imported favorites / watch-later / playlists to cloud after import (for account migration / recovery)</string>
     <string name="enable_local_mylist">Enable Local Favorites</string>
     <string name="enable_local_mylist_summary">Experimental feature: use favorites, watch-later and playlists without logging in, with two-way sync when logged in. Issues may occur — please report them at GitHub Issues.</string>
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="backup_import_push_to_cloud">导入后全量同步收藏、稍后观看、播放清单到云端（用于账号迁移/恢复）</string>
     <string name="enable_local_mylist">启用本地化收藏</string>
     <string name="enable_local_mylist_summary">实验性功能：未登录也可使用收藏、稍后观看、播放清单，登录后与云端双向同步。可能出现问题，欢迎到 GitHub Issues 反馈。</string>
 

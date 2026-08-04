@@ -88,7 +88,14 @@ object BackupManager {
         } ?: error("Unable to open backup file")
     }
 
-    suspend fun importFrom(context: Context, uri: Uri) {
+    /**
+     * 导入备份。
+     *
+     * @param pushToCloud 为 true 时（用于账号迁移 / 封号恢复），导入的本地收藏 /
+     * 稍后观看 / 播放清单会被标记为未同步，下次同步全量推送到云端；
+     * 为 false 时保持备份中的同步标记，导入后以云端为准合并。
+     */
+    suspend fun importFrom(context: Context, uri: Uri, pushToCloud: Boolean) {
         val backup = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             json.decodeFromString<BackupData>(inputStream.bufferedReader().readText())
         } ?: error("Unable to open backup file")
@@ -153,15 +160,34 @@ object BackupManager {
             val dao = LocalMylistDatabase.instance.localMylistDao
             backup.localVideos?.let { localVideos ->
                 dao.deleteAllVideos()
-                dao.upsertVideos(localVideos)
+                dao.upsertVideos(
+                    if (pushToCloud) {
+                        // 全量推送模式：导入的数据视为未同步，下次同步推送到云端
+                        localVideos.map { it.copy(favSynced = false, watchLaterSynced = false) }
+                    } else {
+                        localVideos
+                    }
+                )
             }
             backup.localPlaylists?.let { localPlaylists ->
                 dao.deleteAllPlaylists()
-                dao.upsertPlaylists(localPlaylists)
+                dao.upsertPlaylists(
+                    if (pushToCloud) {
+                        localPlaylists.map { it.copy(synced = false) }
+                    } else {
+                        localPlaylists
+                    }
+                )
             }
             backup.localPlaylistItems?.let { localPlaylistItems ->
                 dao.deleteAllPlaylistItems()
-                dao.upsertPlaylistItems(localPlaylistItems)
+                dao.upsertPlaylistItems(
+                    if (pushToCloud) {
+                        localPlaylistItems.map { it.copy(synced = false) }
+                    } else {
+                        localPlaylistItems
+                    }
+                )
             }
             backup.localMylistTombstones?.let { tombstones ->
                 dao.deleteAllTombstones()

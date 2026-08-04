@@ -10,6 +10,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -96,6 +100,7 @@ fun HomeSettingsRouteScreen(
     var showLauncherPicker by remember { mutableStateOf(false) }
     var showApplyDeepLinksDialog by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var pushToCloudOnImport by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -339,9 +344,15 @@ fun HomeSettingsRouteScreen(
         dismissText = stringResource(R.string.cancel),
         onConfirm = {
             val uri = pendingImportUri ?: return@ConfirmDialog
+            val pushToCloud = pushToCloudOnImport
             pendingImportUri = null
+            pushToCloudOnImport = false
             coroutineScope.launch(Dispatchers.IO) {
-                runCatching { BackupManager.importFrom(context, uri) }
+                runCatching {
+                    BackupManager.importFrom(context, uri, pushToCloud)
+                    // 勾选全量推送时，导入完成立即同步到云端
+                    if (pushToCloud) MylistSyncManager.sync()
+                }
                     .onSuccess {
                         withContext(Dispatchers.Main) {
                             SonnerToast.success(R.string.backup_import_success)
@@ -355,7 +366,29 @@ fun HomeSettingsRouteScreen(
                     }
             }
         },
-        onDismiss = { pendingImportUri = null },
+        onDismiss = {
+            pushToCloudOnImport = false
+            pendingImportUri = null
+        },
+        content = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .toggleable(
+                        value = pushToCloudOnImport,
+                        onValueChange = { pushToCloudOnImport = it },
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = pushToCloudOnImport,
+                    onCheckedChange = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.backup_import_push_to_cloud))
+            }
+        },
     )
 
     ConfirmDialog(
