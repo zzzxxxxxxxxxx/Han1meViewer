@@ -304,7 +304,7 @@ object MylistSyncManager {
         if (remotePlaylists.isNotEmpty()) {
             val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
             DatabaseRepo.LocalMylist.upsertPlaylists(
-                remotePlaylists.map { remote ->
+                remotePlaylists.mapIndexed { index, remote ->
                     localAll[remote.listCode]?.let { local ->
                         if (local.synced) {
                             local.copy(name = remote.title, synced = true)
@@ -315,7 +315,8 @@ object MylistSyncManager {
                     } ?: LocalPlaylistEntity(
                         code = remote.listCode,
                         name = remote.title,
-                        createdTime = System.currentTimeMillis(),
+                        // 按云端列表顺序递减赋时间，保证 ORDER BY createdTime DESC 稳定为云端顺序
+                        createdTime = System.currentTimeMillis() - index,
                         synced = true,
                     )
                 }
@@ -372,13 +373,20 @@ object MylistSyncManager {
                 completed = false
                 break
             }
-            if (items.hanimeInfo.isEmpty()) break
+            // 先处理描述：空清单（无视频）也要能同步简介；
+            // 仅更新已同步的清单，避免覆盖本地待推送（脏）的简介修改
             items.desc?.let { desc ->
-                DatabaseRepo.LocalMylist.upsertPlaylist(
-                    DatabaseRepo.LocalMylist.findPlaylist(playlistCode)?.copy(description = desc)
-                        ?: LocalPlaylistEntity(playlistCode, "", desc, System.currentTimeMillis(), true)
+                DatabaseRepo.LocalMylist.findPlaylist(playlistCode)?.let { playlist ->
+                    if (playlist.synced) {
+                        DatabaseRepo.LocalMylist.upsertPlaylist(
+                            playlist.copy(description = desc)
+                        )
+                    }
+                } ?: DatabaseRepo.LocalMylist.upsertPlaylist(
+                    LocalPlaylistEntity(playlistCode, "", desc, System.currentTimeMillis(), true)
                 )
             }
+            if (items.hanimeInfo.isEmpty()) break
             for (info in items.hanimeInfo) {
                 remoteCodes += info.videoCode
                 merged += localItems[info.videoCode]?.let { local ->
@@ -426,6 +434,29 @@ object MylistSyncManager {
             position = index,
             synced = true,
         )
+
+    /**
+     * 把本地脏清单（UUID code）映射为云端 code。
+     *
+     * app 创建清单时云端接口不返回 code，创建成功后本地仍是 UUID，
+     * 此期间对清单的修改无法即时推送到云端。调用本方法（拉取云端列表 +
+     * 同名匹配）立即完成映射，消除「UUID 未映射期」。未登录或无脏清单时无操作。
+     */
+    suspend fun mapLocalPlaylistCodes() {
+        if (!SettingsRepository.isAlreadyLogin) return
+        if (DatabaseRepo.LocalMylist.getDirtyPlaylists().isEmpty()) return
+        val userId = SettingsRepository.savedUserId
+        if (userId.isBlank()) return
+        val remote = pullPlaylistList(userId)
+        val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
+        val unmatchedRemote = remote.filter { !localAll.containsKey(it.listCode) }.toMutableList()
+        for (playlist in DatabaseRepo.LocalMylist.getDirtyPlaylists()) {
+            if (unmatchedRemote.isEmpty()) break
+            val matched = unmatchedRemote.firstOrNull { it.title == playlist.name } ?: continue
+            migrateLocalPlaylist(playlist, matched.listCode)
+            unmatchedRemote.remove(matched)
+        }
+    }
 
     private suspend fun pushDirtyPlaylists(token: String?) {
         val dirty = DatabaseRepo.LocalMylist.getDirtyPlaylists()

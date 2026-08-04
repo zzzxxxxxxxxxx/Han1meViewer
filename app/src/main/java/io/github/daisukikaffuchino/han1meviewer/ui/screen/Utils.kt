@@ -39,7 +39,7 @@ fun RetryableImage(
 ) {
     val context = LocalContext.current
     var retryCount by remember { mutableIntStateOf(0) }
-    var currentModel by remember { mutableStateOf(model) }
+    var currentModel by remember(model) { mutableStateOf(model) }
 
     AsyncImage(
         model = ImageRequest.Builder(context)

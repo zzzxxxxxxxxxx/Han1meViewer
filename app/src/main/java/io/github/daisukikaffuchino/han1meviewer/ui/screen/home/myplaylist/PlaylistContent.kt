@@ -93,7 +93,7 @@ fun PlaylistContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(uiState.playlists) { playlist ->
+                items(uiState.playlists, key = { it.listCode }) { playlist ->
                     PlaylistItem(
                         playlist = playlist,
                         modifier = Modifier.height(140.dp)

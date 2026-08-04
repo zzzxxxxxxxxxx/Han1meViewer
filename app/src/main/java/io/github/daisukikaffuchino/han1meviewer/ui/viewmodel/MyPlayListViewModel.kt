@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -322,26 +323,37 @@ class MyPlayListViewModel : ViewModel() {
                     _deleteFromPlaylistFlow.emit(WebsiteState.Error(IllegalStateException("cannot delete it ?!")))
                     return@launch
                 }
-                // 已同步的条目记录墓碑，登录同步时推送到云端删除，避免拉取复活
-                if (item.synced) {
+                // 本地操作即时生效
+                DatabaseRepo.LocalMylist.deletePlaylistItem(listCode, videoCode)
+                _deleteFromPlaylistFlow.emit(WebsiteState.Success(position))
+                _playlistFlow.update { prevList ->
+                    prevList.toMutableList().apply { removeAt(position) }
+                }
+                if (SettingsRepository.isAlreadyLogin) {
+                    // 已登录：立即删除云端（并行），失败则记录墓碑（登录同步时补偿）
+                    viewModelScope.launch {
+                        NetworkRepo.deleteMyListItems(listCode, videoCode, position, csrfToken).collect { state ->
+                            if (state is WebsiteState.Error && item.synced) {
+                                DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                                    videoCode = videoCode,
+                                    isPlaylistItem = true,
+                                    playlistCode = listCode,
+                                )
+                            }
+                        }
+                    }
+                } else if (item.synced) {
+                    // 已同步的条目记录墓碑，登录同步时推送到云端删除，避免拉取复活
                     DatabaseRepo.LocalMylist.upsertTombstoneMerged(
                         videoCode = videoCode,
                         isPlaylistItem = true,
                         playlistCode = listCode,
                     )
                 }
-                DatabaseRepo.LocalMylist.deletePlaylistItem(listCode, videoCode)
-                _deleteFromPlaylistFlow.emit(WebsiteState.Success(position))
-                _playlistFlow.update { prevList ->
-                    prevList.toMutableList().apply { removeAt(position) }
-                }
                 return@launch
             }
             NetworkRepo.deleteMyListItems(listCode, videoCode, position, csrfToken).collect {
                 _deleteFromPlaylistFlow.emit(it)
-                if (it is WebsiteState.Success) {
-                    DatabaseRepo.LocalMylist.deletePlaylistItem(listCode, videoCode)
-                }
                 _playlistFlow.update { prevList ->
                     if (it is WebsiteState.Success) {
                         prevList.toMutableList().apply { removeAt(position) }
@@ -358,47 +370,67 @@ class MyPlayListViewModel : ViewModel() {
         viewModelScope.launch {
             if (useLocalMode()) {
                 if (delete) {
-                    // 已同步的清单记录墓碑，登录同步时推送到云端删除，避免拉取复活
-                    DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { playlist ->
-                        if (playlist.synced) {
-                            DatabaseRepo.LocalMylist.upsertTombstoneMerged(
-                                videoCode = playlist.code,
-                                isPlaylist = true,
-                            )
-                        }
-                    }
+                    val wasSynced = DatabaseRepo.LocalMylist
+                        .findPlaylist(listCode)?.synced == true
+                    // 本地操作即时生效
                     DatabaseRepo.LocalMylist.deletePlaylist(listCode)
                     DatabaseRepo.LocalMylist.deleteAllPlaylistItems(listCode)
+                    _modifyPlaylistFlow.emit(
+                        WebsiteState.Success(ModifiedPlaylistArgs(title, desc, delete))
+                    )
+                    clearMyListItems()
+                    if (SettingsRepository.isAlreadyLogin) {
+                        // 已登录：立即删除云端（并行），失败则记录墓碑（登录同步时补偿）
+                        viewModelScope.launch {
+                            NetworkRepo.modifyPlaylist(
+                                listCode, "", "", delete = true, csrfToken
+                            ).collect { state ->
+                                if (state is WebsiteState.Error && wasSynced) {
+                                    DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                                        videoCode = listCode,
+                                        isPlaylist = true,
+                                    )
+                                }
+                            }
+                        }
+                    } else if (wasSynced) {
+                        // 已同步的清单记录墓碑，登录同步时推送到云端删除，避免拉取复活
+                        DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                            videoCode = listCode,
+                            isPlaylist = true,
+                        )
+                    }
                 } else {
                     DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { playlist ->
                         // 标记未同步，登录同步时更新云端（保留云端 code）
                         DatabaseRepo.LocalMylist.upsertPlaylist(
                             playlist.copy(name = title, description = desc, synced = false)
                         )
+                        if (SettingsRepository.isAlreadyLogin) {
+                            // 已登录：立即更新云端（并行），成功则标记已同步，失败保持脏数据下次同步重试
+                            viewModelScope.launch {
+                                NetworkRepo.modifyPlaylist(
+                                    listCode, title, desc, delete = false, csrfToken
+                                ).collect { state ->
+                                    if (state is WebsiteState.Success) {
+                                        DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { updated ->
+                                            DatabaseRepo.LocalMylist.upsertPlaylist(
+                                                updated.copy(name = title, description = desc, synced = true)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-                _modifyPlaylistFlow.emit(
-                    WebsiteState.Success(ModifiedPlaylistArgs(title, desc, delete))
-                )
-                if (delete) {
-                    clearMyListItems()
+                    _modifyPlaylistFlow.emit(
+                        WebsiteState.Success(ModifiedPlaylistArgs(title, desc, delete))
+                    )
                 }
                 return@launch
             }
             NetworkRepo.modifyPlaylist(listCode, title, desc, delete, csrfToken).collect {
                 _modifyPlaylistFlow.emit(it)
-                if (it is WebsiteState.Success) {
-                    if (delete) {
-                        DatabaseRepo.LocalMylist.deletePlaylist(listCode)
-                        DatabaseRepo.LocalMylist.deleteAllPlaylistItems(listCode)
-                    } else {
-                        DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { playlist ->
-                            DatabaseRepo.LocalMylist.upsertPlaylist(
-                                playlist.copy(name = title, description = desc)
-                            )
-                        }
-                    }
-                }
                 if (delete) {
                     clearMyListItems()
                 }
@@ -426,23 +458,25 @@ class MyPlayListViewModel : ViewModel() {
                         synced = false,
                     )
                 )
+                if (SettingsRepository.isAlreadyLogin) {
+                    // 已登录：立即推送到云端（并行，尽力），成功后立即映射本地 code，
+                    // 消除「UUID 未映射期」，后续修改可直接用云端 code 即时推送
+                    viewModelScope.launch {
+                        val state = runCatching {
+                            NetworkRepo.createPlaylist(
+                                EMPTY_STRING, title, description, csrfToken
+                            ).first()
+                        }.getOrNull()
+                        if (state is WebsiteState.Success) {
+                            runCatching { MylistSyncManager.mapLocalPlaylistCodes() }
+                        }
+                    }
+                }
                 _createPlaylistFlow.emit(WebsiteState.Success(Unit))
                 return@launch
             }
             NetworkRepo.createPlaylist(EMPTY_STRING, title, description, csrfToken).collect {
                 _createPlaylistFlow.emit(it)
-                if (it is WebsiteState.Success) {
-                    // 本地镜像：同步引擎登录后按名称匹配补齐云端 code
-                    DatabaseRepo.LocalMylist.upsertPlaylist(
-                        LocalPlaylistEntity(
-                            code = UUID.randomUUID().toString(),
-                            name = title,
-                            description = description,
-                            createdTime = System.currentTimeMillis(),
-                            synced = false,
-                        )
-                    )
-                }
             }
         }
     }

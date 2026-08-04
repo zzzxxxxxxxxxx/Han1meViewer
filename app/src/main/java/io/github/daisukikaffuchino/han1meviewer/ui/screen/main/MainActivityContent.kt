@@ -202,6 +202,8 @@ fun MainActivityContent(
                 destination = destination,
                 isLoggedIn = isLoggedIn,
                 onRequireLogin = { dest ->
+                    // 门禁拦截：与正常导航一致，先收起抽屉再弹对话框
+                    scope.launch { drawerState.close() }
                     if (dest == MainDrawerDestination.Subscription) {
                         showSubscriptionGate = true
                     } else {
