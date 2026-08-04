@@ -50,6 +50,7 @@ import io.github.daisukikaffuchino.han1meviewer.ui.component.UsageNoticeDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.component.HapticTextButton as TextButton
 import io.github.daisukikaffuchino.han1meviewer.ui.component.ConfirmDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.HomeRoute
+import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.LoginRequiredGateDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.MainDrawerDestination
 import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.TopNavigation
 import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.VideoRoute
@@ -101,6 +102,8 @@ fun MainActivityContent(
     }
     var sourceLink by rememberSaveable { mutableStateOf("") }
     var clearLocalMylistOnLogout by remember { mutableStateOf(false) }
+    var showSubscriptionGate by remember { mutableStateOf(false) }
+    var showLocalMylistGate by remember { mutableStateOf(false) }
     var appAccessGranted by remember {
         mutableStateOf(SettingsRepository.usageNoticeAccepted && SettingsRepository.usageSourceVerified)
     }
@@ -198,7 +201,13 @@ fun MainActivityContent(
             val handled = backStack.navigateDrawerDestination(
                 destination = destination,
                 isLoggedIn = isLoggedIn,
-                onRequireLogin = { SonnerToast.warning(R.string.login_first) },
+                onRequireLogin = { dest ->
+                    if (dest == MainDrawerDestination.Subscription) {
+                        showSubscriptionGate = true
+                    } else {
+                        showLocalMylistGate = true
+                    }
+                },
             )
             if (handled) {
                 scope.launch { drawerState.close() }
@@ -369,6 +378,15 @@ fun MainActivityContent(
         dismissText = null,
         onConfirm = HCacheManager::dismissStorageSwitchNotice,
         onDismiss = HCacheManager::dismissStorageSwitchNotice,
+    )
+    LoginRequiredGateDialog(
+        visible = showSubscriptionGate,
+        onDismiss = { showSubscriptionGate = false },
+        showSettingsButton = false,
+    )
+    LoginRequiredGateDialog(
+        visible = showLocalMylistGate,
+        onDismiss = { showLocalMylistGate = false },
     )
 }
 

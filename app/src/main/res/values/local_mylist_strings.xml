@@ -13,6 +13,5 @@
 
     <string name="login_required">Login required</string>
     <string name="local_mylist_gate_message">This feature requires login, or you can enable the experimental local feature in Settings.</string>
-    <string name="local_mylist_operation_gate">Please log in first, or enable the local feature in Settings.</string>
     <string name="go_to_login">Log in</string>
 </resources>

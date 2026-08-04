@@ -63,6 +63,7 @@ import io.github.daisukikaffuchino.han1meviewer.ui.activity.MainActivity
 import io.github.daisukikaffuchino.han1meviewer.ui.bridge.VideoPageHost
 import io.github.daisukikaffuchino.han1meviewer.ui.component.ConfirmDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.HomeRoute
+import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.LoginRequiredGateDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.navigation.main.VideoRoute
 import io.github.daisukikaffuchino.han1meviewer.ui.player.ComposePlaybackController
 import io.github.daisukikaffuchino.han1meviewer.ui.player.PlaybackEngineFactory
@@ -175,6 +176,8 @@ fun VideoRouteHostScreen(
         if (!granted) showNotificationPermissionReason = true
     }
     var showDialog by remember { mutableStateOf(false) }
+    var showLocalMylistGate by remember { mutableStateOf(false) }
+    var showLoginRequiredGate by remember { mutableStateOf(false) }
 
     val actions = remember(activity, scope, viewModel, genres) {
         VideoRouteActions(
@@ -198,6 +201,8 @@ fun VideoRouteHostScreen(
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             },
+            onShowLocalMylistGate = { showLocalMylistGate = true },
+            onShowLoginRequiredGate = { showLoginRequiredGate = true },
         )
     }
 
@@ -745,6 +750,7 @@ fun VideoRouteHostScreen(
                     SonnerToast.success(R.string.copy_to_clipboard)
                 },
                 onIntroductionLinkClick = actions::openIntroductionLink,
+                onShowLocalMylistGate = { showLocalMylistGate = true },
                 stringLongPressShare = stringLongPressShare,
                 pageHost = pageHost,
             )
@@ -818,6 +824,17 @@ fun VideoRouteHostScreen(
             showNotificationPermissionReason = false
             SonnerToast.warning(R.string.msg_deny_download_notification)
         },
+    )
+
+    LoginRequiredGateDialog(
+        visible = showLocalMylistGate,
+        onDismiss = { showLocalMylistGate = false },
+    )
+
+    LoginRequiredGateDialog(
+        visible = showLoginRequiredGate,
+        onDismiss = { showLoginRequiredGate = false },
+        showSettingsButton = false,
     )
 
     ConfirmDialog(

@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.ResolutionLinkMap
+import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.CheckInRecordEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeVideo
@@ -133,6 +134,7 @@ fun VideoIntroductionScreen(
     onRateVideo: (Boolean) -> Unit,
     onManageMyList: (List<String>, List<Boolean>) -> Unit,
     onRefreshMyListState: () -> Unit = {},
+    onShowLocalMylistGate: () -> Unit = {},
     checkInEnabled: Boolean,
     onQuickCheckIn: (CheckInRecordEntity) -> Unit,
     onPrepareDownload: (String) -> Unit,
@@ -174,6 +176,7 @@ fun VideoIntroductionScreen(
                 onRateVideo = onRateVideo,
                 onManageMyList = onManageMyList,
                 onRefreshMyListState = onRefreshMyListState,
+                onShowLocalMylistGate = onShowLocalMylistGate,
                 checkInEnabled = checkInEnabled,
                 onQuickCheckIn = onQuickCheckIn,
                 onPrepareDownload = onPrepareDownload,
@@ -227,6 +230,7 @@ private fun VideoIntroductionContent(
     onRateVideo: (Boolean) -> Unit,
     onManageMyList: (List<String>, List<Boolean>) -> Unit,
     onRefreshMyListState: () -> Unit = {},
+    onShowLocalMylistGate: () -> Unit = {},
     checkInEnabled: Boolean,
     onQuickCheckIn: (CheckInRecordEntity) -> Unit,
     onPrepareDownload: (String) -> Unit,
@@ -391,7 +395,11 @@ private fun VideoIntroductionContent(
                         onToggleFavorite = onToggleFavorite,
                         onManageMyList = {
                             onRefreshMyListState()
-                            showMyListDialog = true
+                            if (SettingsRepository.isLocalMylistEnabled || SettingsRepository.isAlreadyLogin) {
+                                showMyListDialog = true
+                            } else {
+                                onShowLocalMylistGate()
+                            }
                         },
                         onDownload = { showDownloadQualityDialog = true },
                         onShare = onShare,

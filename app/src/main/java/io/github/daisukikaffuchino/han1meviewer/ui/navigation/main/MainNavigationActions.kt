@@ -1,11 +1,23 @@
 package io.github.daisukikaffuchino.han1meviewer.ui.navigation.main
 
 import android.content.Intent
+import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import kotlinx.serialization.json.Json
 
-private val loginRequiredDrawerItems = setOf(
-    MainDrawerDestination.Subscription,
-)
+/**
+ * 未登录时拦截的抽屉入口。
+ * 订阅始终需要登录；本地化功能未开启时，收藏 / 稍后观看 / 播放清单
+ * 也由抽屉直接拦截（弹门禁对话框），而不是导航后由路由层拦截。
+ */
+private fun loginRequiredDrawerItems(): Set<MainDrawerDestination> {
+    val items = mutableSetOf(MainDrawerDestination.Subscription)
+    if (!SettingsRepository.isLocalMylistEnabled) {
+        items += MainDrawerDestination.FavVideo
+        items += MainDrawerDestination.WatchLater
+        items += MainDrawerDestination.Playlist
+    }
+    return items
+}
 
 const val EXTRA_OPEN_DAILY_CHECK_IN = "openDailyCheckIn"
 const val ACTION_OPEN_CLOUDFLARE_VERIFICATION =
@@ -16,10 +28,10 @@ const val EXTRA_CLOUDFLARE_HOST = "cloudflare_host"
 fun TopLevelBackStack<HanimeScreen>.navigateDrawerDestination(
     destination: MainDrawerDestination,
     isLoggedIn: Boolean,
-    onRequireLogin: () -> Unit,
+    onRequireLogin: (MainDrawerDestination) -> Unit,
 ): Boolean {
-    if (destination in loginRequiredDrawerItems && !isLoggedIn) {
-        onRequireLogin()
+    if (destination in loginRequiredDrawerItems() && !isLoggedIn) {
+        onRequireLogin(destination)
         return false
     }
 

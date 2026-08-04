@@ -38,6 +38,8 @@ class VideoRouteActions(
     private val onCopyText: (String) -> Unit,
     private val onRequestUnsubscribe: (HanimeVideo.Artist) -> Unit,
     private val onRequestNotificationPermission: () -> Unit,
+    private val onShowLocalMylistGate: () -> Unit,
+    private val onShowLoginRequiredGate: () -> Unit,
 ) {
     fun openArtistSearch(artist: HanimeVideo.Artist) {
         val searchKey = genres.firstOrNull { option ->
@@ -69,7 +71,7 @@ class VideoRouteActions(
     fun toggleArtistSubscription(artist: HanimeVideo.Artist) {
         val post = artist.post ?: return
         if (!SettingsRepository.isAlreadyLogin) {
-            SonnerToast.warning(R.string.login_first)
+            onShowLoginRequiredGate()
             return
         }
         if (artist.isSubscribed) {
@@ -85,7 +87,7 @@ class VideoRouteActions(
     }
 
     fun toggleFavorite(video: HanimeVideo) {
-        if (!useLocalMylist() && !SettingsRepository.isAlreadyLogin) {
+        if (!SettingsRepository.isLocalMylistEnabled && !SettingsRepository.isAlreadyLogin) {
             showLocalMylistGate()
             return
         }
@@ -99,7 +101,7 @@ class VideoRouteActions(
     fun rateVideo(video: HanimeVideo, isPositive: Boolean) {
         if (isPositive) {
             // 赞即收藏，与收藏按钮同逻辑（本地优先）
-            if (!useLocalMylist() && !SettingsRepository.isAlreadyLogin) {
+            if (!SettingsRepository.isLocalMylistEnabled && !SettingsRepository.isAlreadyLogin) {
                 showLocalMylistGate()
                 return
             }
@@ -122,7 +124,7 @@ class VideoRouteActions(
         selectedStates: List<Boolean>,
     ) {
         if (myList == null || myList.myListInfo.isEmpty()) return
-        if (!useLocalMylist() && !SettingsRepository.isAlreadyLogin) {
+        if (!SettingsRepository.isLocalMylistEnabled && !SettingsRepository.isAlreadyLogin) {
             showLocalMylistGate()
             return
         }
@@ -139,14 +141,8 @@ class VideoRouteActions(
         }
     }
 
-    /**
-     * 本地化功能可用性判断：仅由实验性开关控制。
-     * 关闭时未登录用户的操作被门禁（此处为 toast 提示），已登录用户走纯在线路径。
-     */
-    private fun useLocalMylist() = SettingsRepository.isLocalMylistEnabled
-
     private fun showLocalMylistGate() {
-        SonnerToast.warning(R.string.local_mylist_operation_gate)
+        onShowLocalMylistGate()
     }
 
     fun quickCheckIn(record: CheckInRecordEntity) {

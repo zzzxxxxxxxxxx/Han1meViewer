@@ -14,39 +14,74 @@ import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.ui.activity.MainActivity
-import io.github.daisukikaffuchino.han1meviewer.ui.navigation.settings.HomeSettingsRoute
+import io.github.daisukikaffuchino.han1meviewer.ui.navigation.settings.DataPrivacySettingsRoute
 import io.github.daisukikaffuchino.han1meviewer.ui.screen.home.VideoGridScreen
 import io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.MyListViewModel
 import io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.mylist.LocalVideoListViewModel
 
 /**
- * 未登录且未开启本地化功能时的门禁提示：
- * 引导用户去登录，或去设置开启实验性的本地化功能。
+ * 未登录时的登录门禁对话框：引导用户去登录。
+ * 本地化功能未开启时额外提供「去设置」入口（[showSettingsButton]）；
+ * 纯在线功能（如订阅）只有「去登录 / 取消」两个按钮。
  */
 @Composable
-fun LocalMylistGateScreen(onBack: () -> Unit) {
+fun LoginRequiredGateDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    showSettingsButton: Boolean = true,
+) {
+    if (!visible) return
     val context = LocalContext.current
     AlertDialog(
-        onDismissRequest = onBack,
+        onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.login_required)) },
-        text = { Text(stringResource(R.string.local_mylist_gate_message)) },
+        text = {
+            Text(
+                stringResource(
+                    if (showSettingsButton) {
+                        R.string.local_mylist_gate_message
+                    } else {
+                        R.string.login_first
+                    }
+                )
+            )
+        },
         confirmButton = {
             TextButton(
-                onClick = { (context as? MainActivity)?.mainBackStack?.add(LoginRoute) }
+                onClick = {
+                    onDismiss()
+                    (context as? MainActivity)?.mainBackStack?.add(LoginRoute)
+                }
             ) {
                 Text(stringResource(R.string.go_to_login))
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = { (context as? MainActivity)?.mainBackStack?.add(HomeSettingsRoute) }
-            ) {
-                Text(stringResource(R.string.go_to_settings))
+            if (showSettingsButton) {
+                TextButton(
+                    onClick = {
+                        onDismiss()
+                        (context as? MainActivity)?.mainBackStack?.add(DataPrivacySettingsRoute)
+                    }
+                ) {
+                    Text(stringResource(R.string.go_to_settings))
+                }
             }
-            TextButton(onClick = onBack) {
+            TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
         },
+    )
+}
+
+/**
+ * 抽屉入口的门禁整页：进入即显示 [LoginRequiredGateDialog]。
+ */
+@Composable
+fun LocalMylistGateScreen(onBack: () -> Unit) {
+    LoginRequiredGateDialog(
+        visible = true,
+        onDismiss = onBack,
     )
 }
 

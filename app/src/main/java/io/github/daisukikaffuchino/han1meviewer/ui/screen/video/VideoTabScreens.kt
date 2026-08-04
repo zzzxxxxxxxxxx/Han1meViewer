@@ -44,6 +44,7 @@ fun RenderVideoIntroductionContent(
     onToggleFavorite: (HanimeVideo) -> Unit,
     onRateVideo: (HanimeVideo, Boolean) -> Unit,
     onManageMyList: (HanimeVideo.MyList?, List<Boolean>) -> Unit,
+    onShowLocalMylistGate: () -> Unit,
     onQuickCheckIn: (CheckInRecordEntity) -> Unit,
     onPrepareDownload: (String, HanimeVideo?) -> Unit,
     onConfirmDownloadPrompt: (HanimeVideo?) -> Unit,
@@ -88,6 +89,7 @@ fun RenderVideoIntroductionContent(
                 onManageMyList(video?.myList, selectedStates)
             },
             onRefreshMyListState = { viewModel.refreshLocalMyList() },
+            onShowLocalMylistGate = onShowLocalMylistGate,
             checkInEnabled = checkInEnabled,
             onQuickCheckIn = onQuickCheckIn,
             onPrepareDownload = { quality ->
