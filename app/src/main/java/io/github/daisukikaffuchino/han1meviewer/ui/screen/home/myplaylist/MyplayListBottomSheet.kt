@@ -178,10 +178,12 @@ fun PlaylistBottomSheet(
                         sheetState.hide()
                         onDismiss()
                         SonnerToast.success(R.string.delete_success)
+                        vm.loadMyPlayList()
                         return@collect
                     }
                     SonnerToast.success(R.string.modify_success)
                     vm.getPlaylistItems(1, currentCode, true)
+                    vm.loadMyPlayList()
                 }
             }
         }
@@ -192,7 +194,11 @@ fun PlaylistBottomSheet(
             when (result) {
                 is WebsiteState.Error -> SonnerToast.error(R.string.delete_failed)
                 is WebsiteState.Loading -> {}
-                is WebsiteState.Success -> SonnerToast.success(R.string.delete_success)
+                is WebsiteState.Success -> {
+                    SonnerToast.success(R.string.delete_success)
+                    // 刷新清单网格（在线模式；本地模式由 Room 流自动刷新，loadMyPlayList 内部 no-op）
+                    vm.loadMyPlayList()
+                }
             }
         }
     }

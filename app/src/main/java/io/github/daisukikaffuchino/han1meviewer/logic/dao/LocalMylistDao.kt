@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
@@ -60,10 +61,10 @@ interface LocalMylistDao {
 
     //<editor-fold desc="LocalPlaylistEntity（播放清单）">
 
-    @Query("SELECT * FROM LocalPlaylistEntity ORDER BY createdTime DESC")
+    @Query("SELECT * FROM LocalPlaylistEntity ORDER BY createdTime DESC, code ASC")
     fun observePlaylists(): Flow<List<LocalPlaylistEntity>>
 
-    @Query("SELECT * FROM LocalPlaylistEntity ORDER BY createdTime DESC")
+    @Query("SELECT * FROM LocalPlaylistEntity ORDER BY createdTime DESC, code ASC")
     suspend fun getAllPlaylists(): List<LocalPlaylistEntity>
 
     @Query("SELECT * FROM LocalPlaylistEntity WHERE code = :code LIMIT 1")
@@ -139,6 +140,22 @@ interface LocalMylistDao {
 
     @Query("DELETE FROM LocalMylistTombstoneEntity WHERE videoCode = :videoCode")
     suspend fun deleteTombstone(videoCode: String)
+
+    //</editor-fold>
+
+    //<editor-fold desc="LocalPlaylistItemTombstoneEntity（清单内视频删除墓碑）">
+
+    @Query("SELECT * FROM LocalPlaylistItemTombstoneEntity ORDER BY deletedTime ASC")
+    suspend fun getPlaylistItemTombstones(): List<LocalPlaylistItemTombstoneEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPlaylistItemTombstone(entity: LocalPlaylistItemTombstoneEntity)
+
+    @Query("DELETE FROM LocalPlaylistItemTombstoneEntity WHERE videoCode = :videoCode AND playlistCode = :playlistCode")
+    suspend fun deletePlaylistItemTombstone(videoCode: String, playlistCode: String)
+
+    @Query("DELETE FROM LocalPlaylistItemTombstoneEntity")
+    suspend fun deleteAllPlaylistItemTombstones()
 
     //</editor-fold>
 }

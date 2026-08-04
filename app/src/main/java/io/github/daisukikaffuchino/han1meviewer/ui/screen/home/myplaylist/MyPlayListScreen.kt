@@ -87,7 +87,7 @@ fun PlaylistScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-            LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         viewModel.createPlaylistFlow.collect { result ->
             when (result) {
                 is WebsiteState.Error -> SonnerToast.error(R.string.add_failed)

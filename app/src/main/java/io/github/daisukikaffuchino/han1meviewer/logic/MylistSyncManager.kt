@@ -14,6 +14,7 @@ import io.github.daisukikaffuchino.han1meviewer.logic.state.WebsiteState
 import io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * 本地收藏 / 稍后观看 / 播放清单 与云端的同步引擎。
@@ -28,8 +29,7 @@ import kotlinx.coroutines.flow.firstOrNull
  */
 object MylistSyncManager {
 
-    @Volatile
-    private var isSyncing = false
+    private val syncMutex = Mutex()
 
     /**
      * 执行双向合并。登录成功后或打开列表界面时调用，
@@ -38,14 +38,14 @@ object MylistSyncManager {
      * 顺序统一为「先推后拉」：墓碑 → 本地脏数据推送 → 云端拉取合并。
      */
     suspend fun sync() {
-        if (isSyncing) return
-        isSyncing = true
+        if (!syncMutex.tryLock()) return
         try {
             if (!SettingsRepository.isAlreadyLogin) return
             if (!SettingsRepository.isLocalMylistEnabled) return
             val userId = SettingsRepository.savedUserId
             if (userId.isBlank()) return
-            val token = obtainCsrfToken() ?: return
+            // token 仅推送需要；获取失败时不中断，拉取合并（无需 token）照常执行
+            val token = obtainCsrfToken()
             pushTombstones(userId, token)
             pushDirtyFavorites(userId, token)
             pushDirtyWatchLater(userId, token)
@@ -53,7 +53,7 @@ object MylistSyncManager {
             pullWatchLater(userId)
             syncPlaylists(userId, token)
         } finally {
-            isSyncing = false
+            syncMutex.unlock()
         }
     }
 
@@ -74,7 +74,6 @@ object MylistSyncManager {
             var isFav = tombstone.isFav
             var isWatchLater = tombstone.isWatchLater
             var isPlaylist = tombstone.isPlaylist
-            var isPlaylistItem = tombstone.isPlaylistItem
             if (isFav) {
                 val succeeded = runCatching {
                     NetworkRepo.addToMyFavVideo(
@@ -111,31 +110,35 @@ object MylistSyncManager {
                 }.getOrNull() is WebsiteState.Success
                 if (succeeded) isPlaylist = false
             }
-            if (isPlaylistItem) {
-                // 云端从清单中移除视频
-                val succeeded = runCatching {
-                    NetworkRepo.addToMyList(
-                        listCode = tombstone.playlistCode.orEmpty(),
-                        videoCode = tombstone.videoCode,
-                        isChecked = false,
-                        position = 0,
-                        csrfToken = token,
-                    ).first()
-                }.getOrNull() is WebsiteState.Success
-                if (succeeded) isPlaylistItem = false
-            }
-            if (!isFav && !isWatchLater && !isPlaylist && !isPlaylistItem) {
+            if (!isFav && !isWatchLater && !isPlaylist) {
                 DatabaseRepo.LocalMylist.deleteTombstone(tombstone.videoCode)
             } else if (isFav != tombstone.isFav || isWatchLater != tombstone.isWatchLater ||
-                isPlaylist != tombstone.isPlaylist || isPlaylistItem != tombstone.isPlaylistItem
+                isPlaylist != tombstone.isPlaylist
             ) {
                 DatabaseRepo.LocalMylist.upsertTombstone(
                     tombstone.copy(
                         isFav = isFav,
                         isWatchLater = isWatchLater,
                         isPlaylist = isPlaylist,
-                        isPlaylistItem = isPlaylistItem,
                     )
+                )
+            }
+        }
+        // 清单内视频删除墓碑：按「视频 + 清单」逐条推送到云端删除
+        for (tombstone in DatabaseRepo.LocalMylist.getPlaylistItemTombstones()) {
+            val succeeded = runCatching {
+                NetworkRepo.addToMyList(
+                    listCode = tombstone.playlistCode,
+                    videoCode = tombstone.videoCode,
+                    isChecked = false,
+                    position = 0,
+                    csrfToken = token,
+                ).first()
+            }.getOrNull() is WebsiteState.Success
+            if (succeeded) {
+                DatabaseRepo.LocalMylist.deletePlaylistItemTombstone(
+                    tombstone.videoCode,
+                    tombstone.playlistCode,
                 )
             }
         }
@@ -300,34 +303,41 @@ object MylistSyncManager {
         // 再拉取合并，避免云端清单先写入本地导致同名映射失效、重复创建
         pushDirtyPlaylists(token)
 
-        val remotePlaylists = pullPlaylistList(userId)
+        val (remotePlaylists, pullCompleted) = pullPlaylistList(userId)
         if (remotePlaylists.isNotEmpty()) {
             val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
+            // 单次取基准时间，保证同一批 createdTime 严格互异（now - index），
+            // 避免每行独立取 now + 跨页 index 重叠导致排序键碰撞
+            val base = System.currentTimeMillis()
             DatabaseRepo.LocalMylist.upsertPlaylists(
                 remotePlaylists.mapIndexed { index, remote ->
                     localAll[remote.listCode]?.let { local ->
                         if (local.synced) {
-                            local.copy(name = remote.title, synced = true)
+                            // 已同步清单跟随云端顺序（每次同步重排 createdTime），
+                            // 保证显示顺序 = 云端顺序且帧间稳定
+                            local.copy(name = remote.title, createdTime = base - index)
                         } else {
-                            // 待推送改名的脏清单：保留本地名称，避免云端旧名覆盖
+                            // 待推送改名的脏清单：保留本地名称与创建时间，避免云端旧名覆盖
                             local
                         }
                     } ?: LocalPlaylistEntity(
                         code = remote.listCode,
                         name = remote.title,
-                        // 按云端列表顺序递减赋时间，保证 ORDER BY createdTime DESC 稳定为云端顺序
-                        createdTime = System.currentTimeMillis() - index,
+                        createdTime = base - index,
                         synced = true,
                     )
                 }
             )
         }
-        // 云端已删除的已同步清单：本地同步删除（含清单内视频）
-        val remoteCodes = remotePlaylists.mapTo(mutableSetOf()) { it.listCode }
-        for (playlist in DatabaseRepo.LocalMylist.getAllPlaylists()) {
-            if (playlist.synced && playlist.code !in remoteCodes) {
-                DatabaseRepo.LocalMylist.deletePlaylist(playlist.code)
-                DatabaseRepo.LocalMylist.deleteAllPlaylistItems(playlist.code)
+        // 云端已删除的已同步清单：本地同步删除（含清单内视频）——
+        // 仅完整拉取时执行，分页失败跳过清理，避免误删本地数据
+        if (pullCompleted) {
+            val remoteCodes = remotePlaylists.mapTo(mutableSetOf()) { it.listCode }
+            for (playlist in DatabaseRepo.LocalMylist.getAllPlaylists()) {
+                if (playlist.synced && playlist.code !in remoteCodes) {
+                    DatabaseRepo.LocalMylist.deletePlaylist(playlist.code)
+                    DatabaseRepo.LocalMylist.deleteAllPlaylistItems(playlist.code)
+                }
             }
         }
 
@@ -341,18 +351,29 @@ object MylistSyncManager {
         }
     }
 
-    private suspend fun pullPlaylistList(userId: String): List<Playlists.Playlist> {
+    /**
+     * 分页拉取云端播放清单列表。
+     *
+     * @return 拉取到的清单列表 + 是否完整（任一页请求失败时 completed 为 false，
+     * 调用方应跳过「清除云端缺失条目」的清理，避免误删本地数据）。
+     */
+    private suspend fun pullPlaylistList(userId: String): Pair<List<Playlists.Playlist>, Boolean> {
         val result = mutableListOf<Playlists.Playlist>()
         var page = 1
+        var completed = true
         while (page <= 100) {
             val playlists = runCatching {
                 NetworkRepo.getPlaylists(page, userId).first() as? WebsiteState.Success
-            }.getOrNull()?.info?.playlists ?: break
+            }.getOrNull()?.info?.playlists
+            if (playlists == null) {
+                completed = false
+                break
+            }
             if (playlists.isEmpty()) break
             result += playlists
             page++
         }
-        return result
+        return result to completed
     }
 
     private suspend fun pullPlaylistItems(playlistCode: String) {
@@ -374,10 +395,11 @@ object MylistSyncManager {
                 break
             }
             // 先处理描述：空清单（无视频）也要能同步简介；
-            // 仅更新已同步的清单，避免覆盖本地待推送（脏）的简介修改
+            // 仅更新已同步的清单（避免覆盖本地待推送的脏简介），且仅在简介变化时写入，
+            // 避免每次同步都无谓触发列表流重发
             items.desc?.let { desc ->
                 DatabaseRepo.LocalMylist.findPlaylist(playlistCode)?.let { playlist ->
-                    if (playlist.synced) {
+                    if (playlist.synced && playlist.description != desc) {
                         DatabaseRepo.LocalMylist.upsertPlaylist(
                             playlist.copy(description = desc)
                         )
@@ -447,7 +469,7 @@ object MylistSyncManager {
         if (DatabaseRepo.LocalMylist.getDirtyPlaylists().isEmpty()) return
         val userId = SettingsRepository.savedUserId
         if (userId.isBlank()) return
-        val remote = pullPlaylistList(userId)
+        val remote = pullPlaylistList(userId).first
         val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
         val unmatchedRemote = remote.filter { !localAll.containsKey(it.listCode) }.toMutableList()
         for (playlist in DatabaseRepo.LocalMylist.getDirtyPlaylists()) {
@@ -464,7 +486,7 @@ object MylistSyncManager {
         if (!SettingsRepository.isAlreadyLogin) return
         val userId = SettingsRepository.savedUserId
         if (userId.isBlank()) return
-        val remote = pullPlaylistList(userId)
+        val remote = pullPlaylistList(userId).first
         val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
         val remoteByCode = remote.associateBy { it.listCode }
 
@@ -518,7 +540,7 @@ object MylistSyncManager {
 
         // 创建成功后云端清单 code 未知，重新拉取并按名称匹配以更新本地 code
         if (toCreate.isEmpty()) return
-        val remoteAfterPush = pullPlaylistList(userId)
+        val remoteAfterPush = pullPlaylistList(userId).first
         val localAllAfter = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
         val unmatchedAfter = remoteAfterPush.filter { !localAllAfter.containsKey(it.listCode) }.toMutableList()
         for (playlist in toCreate) {
@@ -543,6 +565,8 @@ object MylistSyncManager {
             playlist.copy(code = cloudCode, synced = true)
         )
         DatabaseRepo.LocalMylist.deletePlaylist(playlist.code)
+        // 清理旧 code 下残留的清单条目行（迁移后的行已写入新 code）
+        DatabaseRepo.LocalMylist.deleteAllPlaylistItems(playlist.code)
     }
 
     private suspend fun pushDirtyPlaylistItems(token: String?) {

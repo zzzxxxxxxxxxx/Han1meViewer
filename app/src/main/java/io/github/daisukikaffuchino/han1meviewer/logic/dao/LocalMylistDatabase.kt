@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
@@ -20,6 +21,7 @@ import io.github.daisukikaffuchino.utils.applicationContext
         LocalPlaylistEntity::class,
         LocalPlaylistItemEntity::class,
         LocalMylistTombstoneEntity::class,
+        LocalPlaylistItemTombstoneEntity::class,
     ],
     version = 1, exportSchema = false
 )

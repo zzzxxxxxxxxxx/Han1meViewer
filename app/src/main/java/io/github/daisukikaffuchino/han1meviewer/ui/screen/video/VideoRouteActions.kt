@@ -100,13 +100,14 @@ class VideoRouteActions(
 
     fun rateVideo(video: HanimeVideo, isPositive: Boolean) {
         if (isPositive) {
-            // 赞即收藏，与收藏按钮同逻辑（本地优先）
+            // 赞即收藏：登录时与上游一致调评分 API（好评计数 + 云端赞过列表，网页端原生行为）；
+            // 未登录 + 本地化开关开启时仅本地收藏，不更新好评计数
             if (!SettingsRepository.isLocalMylistEnabled && !SettingsRepository.isAlreadyLogin) {
                 showLocalMylistGate()
                 return
             }
-            if (video.isFav) {
-                viewModel.removeFromFavVideo(viewModel.videoCode, video.currentUserId)
+            if (SettingsRepository.isAlreadyLogin) {
+                viewModel.rateVideo(video, isPositive)
             } else {
                 viewModel.addToFavVideo(viewModel.videoCode, video.currentUserId)
             }

@@ -334,9 +334,8 @@ class MyPlayListViewModel : ViewModel() {
                     viewModelScope.launch {
                         NetworkRepo.deleteMyListItems(listCode, videoCode, position, csrfToken).collect { state ->
                             if (state is WebsiteState.Error && item.synced) {
-                                DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                                DatabaseRepo.LocalMylist.upsertPlaylistItemTombstone(
                                     videoCode = videoCode,
-                                    isPlaylistItem = true,
                                     playlistCode = listCode,
                                 )
                             }
@@ -344,9 +343,8 @@ class MyPlayListViewModel : ViewModel() {
                     }
                 } else if (item.synced) {
                     // 已同步的条目记录墓碑，登录同步时推送到云端删除，避免拉取复活
-                    DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                    DatabaseRepo.LocalMylist.upsertPlaylistItemTombstone(
                         videoCode = videoCode,
-                        isPlaylistItem = true,
                         playlistCode = listCode,
                     )
                 }

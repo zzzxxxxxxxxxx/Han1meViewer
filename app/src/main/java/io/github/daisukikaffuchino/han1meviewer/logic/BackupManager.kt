@@ -22,6 +22,7 @@ import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.DownloadGr
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.HanimeCategoryCrossRef
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.HanimeDownloadEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
@@ -59,6 +60,7 @@ object BackupManager {
         val localPlaylists: List<LocalPlaylistEntity>? = null,
         val localPlaylistItems: List<LocalPlaylistItemEntity>? = null,
         val localMylistTombstones: List<LocalMylistTombstoneEntity>? = null,
+        val localPlaylistItemTombstones: List<LocalPlaylistItemTombstoneEntity>? = null,
     )
 
     @Serializable
@@ -155,7 +157,8 @@ object BackupManager {
         }
 
         if (backup.localVideos != null || backup.localPlaylists != null ||
-            backup.localPlaylistItems != null || backup.localMylistTombstones != null
+            backup.localPlaylistItems != null || backup.localMylistTombstones != null ||
+            backup.localPlaylistItemTombstones != null
         ) {
             val dao = LocalMylistDatabase.instance.localMylistDao
             backup.localVideos?.let { localVideos ->
@@ -193,6 +196,10 @@ object BackupManager {
                 dao.deleteAllTombstones()
                 tombstones.forEach { dao.upsertTombstone(it) }
             }
+            backup.localPlaylistItemTombstones?.let { tombstones ->
+                dao.deleteAllPlaylistItemTombstones()
+                tombstones.forEach { dao.upsertPlaylistItemTombstone(it) }
+            }
         }
 
         backup.settings?.let { settings ->
@@ -226,6 +233,8 @@ object BackupManager {
             localPlaylists = LocalMylistDatabase.instance.localMylistDao.getAllPlaylists(),
             localPlaylistItems = LocalMylistDatabase.instance.localMylistDao.getAllPlaylistItems(),
             localMylistTombstones = LocalMylistDatabase.instance.localMylistDao.getTombstones(),
+            localPlaylistItemTombstones =
+                LocalMylistDatabase.instance.localMylistDao.getPlaylistItemTombstones(),
         )
         outputStream.bufferedWriter().use { writer ->
             writer.write(json.encodeToString(backup))

@@ -126,11 +126,15 @@ class LocalVideoListViewModel(
                     _deleteFlow.emit(WebsiteState.Error(IllegalStateException("delete failed")))
                 }
             } else {
-                DatabaseRepo.LocalMylist.upsertTombstoneMerged(
-                    videoCode = videoCode,
-                    isFav = isFavoriteMode,
-                    isWatchLater = !isFavoriteMode,
-                )
+                // 未登录或未同步：仅已同步的条目记录墓碑（云端存在、需推送删除），
+                // 未同步条目云端不存在，直接本地删除即可
+                if (synced) {
+                    DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                        videoCode = videoCode,
+                        isFav = isFavoriteMode,
+                        isWatchLater = !isFavoriteMode,
+                    )
+                }
                 removeLocalVideo(entity)
                 _deleteFlow.emit(WebsiteState.Success(true))
             }

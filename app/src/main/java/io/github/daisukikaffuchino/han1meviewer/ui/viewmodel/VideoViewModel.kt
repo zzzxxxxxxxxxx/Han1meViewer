@@ -443,9 +443,8 @@ class VideoViewModel(
                         }
                         // 云端移除失败：记录墓碑，登录同步时补偿，避免拉取复活
                         if (!isChecked && state is WebsiteState.Error && wasSynced) {
-                            DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                            DatabaseRepo.LocalMylist.upsertPlaylistItemTombstone(
                                 videoCode = videoCode,
-                                isPlaylistItem = true,
                                 playlistCode = listCode,
                             )
                         }
@@ -453,9 +452,8 @@ class VideoViewModel(
                 } else {
                     // 未登录取消勾选已同步条目：记录墓碑，登录后推送到云端删除
                     if (!isChecked && wasSynced) {
-                        DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                        DatabaseRepo.LocalMylist.upsertPlaylistItemTombstone(
                             videoCode = videoCode,
-                            isPlaylistItem = true,
                             playlistCode = listCode,
                         )
                     }

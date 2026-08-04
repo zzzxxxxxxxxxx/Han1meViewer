@@ -15,6 +15,7 @@ import io.github.daisukikaffuchino.han1meviewer.logic.entity.WatchHistoryEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.DownloadGroupEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.HanimeDownloadEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalVideoEntity
@@ -341,15 +342,14 @@ object DatabaseRepo {
         suspend fun deleteTombstone(videoCode: String) = dao.deleteTombstone(videoCode)
 
         /**
-         * 写入删除墓碑，与已有墓碑的标志做合并（不同类型并存时不会互相覆盖）。
+         * 写入视频维度删除墓碑（收藏 / 稍后观看 / 播放清单），
+         * 与已有墓碑的标志做合并（不同类型并存时不会互相覆盖）。
          */
         suspend fun upsertTombstoneMerged(
             videoCode: String,
             isFav: Boolean = false,
             isWatchLater: Boolean = false,
             isPlaylist: Boolean = false,
-            isPlaylistItem: Boolean = false,
-            playlistCode: String? = null,
         ) {
             val existing = dao.findTombstone(videoCode)
             dao.upsertTombstone(
@@ -357,14 +357,28 @@ object DatabaseRepo {
                     isFav = existing.isFav || isFav,
                     isWatchLater = existing.isWatchLater || isWatchLater,
                     isPlaylist = existing.isPlaylist || isPlaylist,
-                    isPlaylistItem = existing.isPlaylistItem || isPlaylistItem,
-                    playlistCode = playlistCode ?: existing.playlistCode,
                 ) ?: LocalMylistTombstoneEntity(
                     videoCode = videoCode,
                     isFav = isFav,
                     isWatchLater = isWatchLater,
                     isPlaylist = isPlaylist,
-                    isPlaylistItem = isPlaylistItem,
+                    deletedTime = System.currentTimeMillis(),
+                )
+            )
+        }
+
+        suspend fun getPlaylistItemTombstones() = dao.getPlaylistItemTombstones()
+        suspend fun deletePlaylistItemTombstone(videoCode: String, playlistCode: String) =
+            dao.deletePlaylistItemTombstone(videoCode, playlistCode)
+
+        /**
+         * 写入清单内视频删除墓碑（videoCode + playlistCode 复合主键），
+         * 同一视频从多个清单删除时逐条记录，互不覆盖。
+         */
+        suspend fun upsertPlaylistItemTombstone(videoCode: String, playlistCode: String) {
+            dao.upsertPlaylistItemTombstone(
+                LocalPlaylistItemTombstoneEntity(
+                    videoCode = videoCode,
                     playlistCode = playlistCode,
                     deletedTime = System.currentTimeMillis(),
                 )
@@ -381,6 +395,7 @@ object DatabaseRepo {
             dao.deleteAllPlaylists()
             dao.deleteAllPlaylistItems()
             dao.deleteAllTombstones()
+            dao.deleteAllPlaylistItemTombstones()
         }
     }
 }
