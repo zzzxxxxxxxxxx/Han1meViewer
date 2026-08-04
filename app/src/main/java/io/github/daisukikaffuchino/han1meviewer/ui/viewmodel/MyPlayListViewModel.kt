@@ -133,20 +133,28 @@ class MyPlayListViewModel : ViewModel() {
     private fun useLocalMode() =
         SettingsRepository.isLocalMylistEnabled
 
+    /**
+     * 观察本地清单列表：同时观察清单表与清单内视频表，
+     * 保证封面（取自清单第一个视频）在任何 items 变化后都会重算刷新。
+     */
     private fun observeLocalPlaylists() =
-        DatabaseRepo.LocalMylist.observePlaylists().flatMapLatest { playlists ->
-            flow {
-                emit(playlists.map { playlist ->
-                    val items = DatabaseRepo.LocalMylist.getPlaylistItems(playlist.code)
-                    Playlists.Playlist(
-                        listCode = playlist.code,
-                        title = playlist.name,
-                        total = items.size,
-                        coverUrl = items.firstOrNull()?.coverUrl,
-                    )
-                })
+        combine(
+            DatabaseRepo.LocalMylist.observePlaylists(),
+            DatabaseRepo.LocalMylist.observeAllPlaylistItems(),
+        ) { playlists, _ -> playlists }
+            .flatMapLatest { playlists ->
+                flow {
+                    emit(playlists.map { playlist ->
+                        val items = DatabaseRepo.LocalMylist.getPlaylistItems(playlist.code)
+                        Playlists.Playlist(
+                            listCode = playlist.code,
+                            title = playlist.name,
+                            total = items.size,
+                            coverUrl = items.firstOrNull()?.coverUrl,
+                        )
+                    })
+                }
             }
-        }
 
     /**
      * 下拉刷新：本地化模式触发云端同步（数据库更新后列表自动刷新），

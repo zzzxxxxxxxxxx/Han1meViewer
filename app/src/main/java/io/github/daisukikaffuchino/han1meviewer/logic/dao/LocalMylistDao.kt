@@ -91,6 +91,9 @@ interface LocalMylistDao {
     @Query("SELECT * FROM LocalPlaylistItemEntity WHERE playlistCode = :playlistCode ORDER BY position ASC")
     fun observePlaylistItems(playlistCode: String): Flow<List<LocalPlaylistItemEntity>>
 
+    @Query("SELECT * FROM LocalPlaylistItemEntity")
+    fun observeAllPlaylistItems(): Flow<List<LocalPlaylistItemEntity>>
+
     @Query("SELECT * FROM LocalPlaylistItemEntity WHERE playlistCode = :playlistCode ORDER BY position ASC")
     suspend fun getPlaylistItems(playlistCode: String): List<LocalPlaylistItemEntity>
 

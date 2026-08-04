@@ -319,6 +319,7 @@ object DatabaseRepo {
         //<editor-fold desc="清单内视频">
 
         fun observePlaylistItems(playlistCode: String) = dao.observePlaylistItems(playlistCode)
+        fun observeAllPlaylistItems() = dao.observeAllPlaylistItems()
         suspend fun getPlaylistItems(playlistCode: String) = dao.getPlaylistItems(playlistCode)
         suspend fun getPlaylistItemCodes(playlistCode: String, videoCodes: List<String>) =
             dao.getPlaylistItemCodes(playlistCode, videoCodes)
