@@ -403,6 +403,10 @@ class VideoViewModel(
                     _modifyMyListFlow.emit(WebsiteState.Success(position))
                 }
             } else {
+                // 记录勾选前该视频是否已同步到云端（用于取消勾选时写删除墓碑）
+                val wasSynced = DatabaseRepo.LocalMylist
+                    .getPlaylistItemCodes(listCode, listOf(videoCode))
+                    .firstOrNull()?.synced == true
                 modifyLocalPlaylistItem(listCode, videoCode, isChecked, video)
                 if (SettingsRepository.isAlreadyLogin) {
                     NetworkRepo.addToMyList(listCode, videoCode, isChecked, position, csrfToken).collect { state ->
@@ -414,8 +418,24 @@ class VideoViewModel(
                                 item.copy(synced = state is WebsiteState.Success)
                             )
                         }
+                        // 云端移除失败：记录墓碑，登录同步时补偿，避免拉取复活
+                        if (!isChecked && state is WebsiteState.Error && wasSynced) {
+                            DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                                videoCode = videoCode,
+                                isPlaylistItem = true,
+                                playlistCode = listCode,
+                            )
+                        }
                     }
                 } else {
+                    // 未登录取消勾选已同步条目：记录墓碑，登录后推送到云端删除
+                    if (!isChecked && wasSynced) {
+                        DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                            videoCode = videoCode,
+                            isPlaylistItem = true,
+                            playlistCode = listCode,
+                        )
+                    }
                     _modifyMyListFlow.emit(WebsiteState.Success(position))
                 }
                 updateMyListSelectionUi(listCode, isChecked)

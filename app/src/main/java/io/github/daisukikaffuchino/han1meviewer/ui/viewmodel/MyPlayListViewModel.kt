@@ -169,7 +169,7 @@ class MyPlayListViewModel : ViewModel() {
             if (listCode.isBlank()) return@launch
             DatabaseRepo.LocalMylist.observePlaylistItems(listCode).collect { items ->
                 val hanimeInfos = items.map { it.toHanimeInfo() }
-                _playlistDesc.value = null
+                _playlistDesc.value = DatabaseRepo.LocalMylist.findPlaylist(listCode)?.description
                 _playlistFlow.value = hanimeInfos
                 _playlistStateFlow.value = if (hanimeInfos.isEmpty()) {
                     PageLoadingState.NoMoreData
@@ -194,6 +194,14 @@ class MyPlayListViewModel : ViewModel() {
                 if (item == null) {
                     _deleteFromPlaylistFlow.emit(WebsiteState.Error(IllegalStateException("cannot delete it ?!")))
                     return@launch
+                }
+                // 已同步的条目记录墓碑，登录同步时推送到云端删除，避免拉取复活
+                if (item.synced) {
+                    DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                        videoCode = videoCode,
+                        isPlaylistItem = true,
+                        playlistCode = listCode,
+                    )
                 }
                 DatabaseRepo.LocalMylist.deletePlaylistItem(listCode, videoCode)
                 _deleteFromPlaylistFlow.emit(WebsiteState.Success(position))
@@ -223,12 +231,22 @@ class MyPlayListViewModel : ViewModel() {
         viewModelScope.launch {
             if (!SettingsRepository.isAlreadyLogin) {
                 if (delete) {
+                    // 已同步的清单记录墓碑，登录同步时推送到云端删除，避免拉取复活
+                    DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { playlist ->
+                        if (playlist.synced) {
+                            DatabaseRepo.LocalMylist.upsertTombstoneMerged(
+                                videoCode = playlist.code,
+                                isPlaylist = true,
+                            )
+                        }
+                    }
                     DatabaseRepo.LocalMylist.deletePlaylist(listCode)
                     DatabaseRepo.LocalMylist.deleteAllPlaylistItems(listCode)
                 } else {
                     DatabaseRepo.LocalMylist.findPlaylist(listCode)?.let { playlist ->
+                        // 标记未同步，登录同步时更新云端（保留云端 code）
                         DatabaseRepo.LocalMylist.upsertPlaylist(
-                            playlist.copy(name = title, description = desc)
+                            playlist.copy(name = title, description = desc, synced = false)
                         )
                     }
                 }

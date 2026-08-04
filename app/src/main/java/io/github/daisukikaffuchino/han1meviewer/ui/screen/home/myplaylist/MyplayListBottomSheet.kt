@@ -113,10 +113,11 @@ fun PlaylistBottomSheet(
 
     LaunchedEffect(currentCode) {
         if (currentCode.isNotEmpty()) {
-            MylistSyncManager.sync()
+            // 先加载本地数据（立即显示），再后台同步云端
             if (playlist.isEmpty()) {
                 vm.getPlaylistItems(1, currentCode, true)
             }
+            MylistSyncManager.sync()
         } else {
             SonnerToast.error(R.string.unknown_error)
         }
