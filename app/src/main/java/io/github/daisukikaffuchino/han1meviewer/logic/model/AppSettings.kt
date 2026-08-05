@@ -134,6 +134,7 @@ data class AppSettings(
     val safDownloadPath: String? = null,
     val collapseDownloadedGroup: Boolean = false,
     val playerKernel: PlayerKernel = PlayerKernel.ExoPlayer,
+    val enableGoogleCast: Boolean = false,
     val showBottomProgress: Boolean = true,
     val playerSpeed: Float = 1f,
     val slideSensitivity: Int = 4,

@@ -26,6 +26,7 @@ import io.github.daisukikaffuchino.han1meviewer.HFileManager
 import io.github.daisukikaffuchino.han1meviewer.HFileManager.createVideoName
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.logic.DatabaseRepo
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.DownloadGroupEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.HanimeDownloadEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.network.ServiceCreator
 import io.github.daisukikaffuchino.han1meviewer.logic.state.DownloadState
@@ -78,6 +79,7 @@ class HanimeDownloadWorker(
         val hanimeName: String,
         val videoCode: String,
         val coverUrl: String,
+        val groupId: Int = DownloadGroupEntity.DEFAULT_GROUP_ID,
     ) {
         companion object {
             fun fromEntity(entity: HanimeDownloadEntity): Args {
@@ -88,6 +90,7 @@ class HanimeDownloadWorker(
                     hanimeName = entity.title,
                     videoCode = entity.videoCode,
                     coverUrl = entity.coverUrl,
+                    groupId = entity.groupId,
                 )
             }
         }
@@ -111,6 +114,7 @@ class HanimeDownloadWorker(
         const val HANIME_NAME = "hanime_name"
         const val VIDEO_CODE = "video_code"
         const val COVER_URL = "cover_url"
+        const val GROUP_ID = "group_id"
         const val REDOWNLOAD = "redownload"
         const val IN_WAITING_QUEUE = "in_waiting_queue"
         // const val RELEASE_DATE = "release_date"
@@ -165,6 +169,7 @@ class HanimeDownloadWorker(
     private val quality by inputData(QUALITY, EMPTY_STRING)
     private val videoCode by inputData(VIDEO_CODE, EMPTY_STRING)
     private val coverUrl by inputData(COVER_URL, EMPTY_STRING)
+    private val groupId by inputData(GROUP_ID, DownloadGroupEntity.DEFAULT_GROUP_ID)
 
     private val fastPathCancel by inputData(FAST_PATH_CANCEL, false)
     private val shouldDelete by inputData(DELETE, false)
@@ -200,6 +205,7 @@ class HanimeDownloadWorker(
                 if (len > 0) {
                     // 创建数据库记录
                     val entity = HanimeDownloadEntity(
+                        groupId = groupId,
                         coverUrl = coverUrl,
                         coverUri = null,
                         title = hanimeName,

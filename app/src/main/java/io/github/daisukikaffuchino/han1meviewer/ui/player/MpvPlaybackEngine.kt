@@ -40,16 +40,25 @@ class MpvPlaybackEngine(
     private var lastVideoWidth = 0
     private var lastVideoHeight = 0
     private var hasRenderedFrame = false
+    private var hasReachedEndOfFile = false
+    private var lastKnownPositionMs = 0L
+    private var lastKnownDurationMs = 0L
     private val observer = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = publishState()
         override fun eventProperty(property: String, value: Double) = publishState()
         override fun eventProperty(property: String, value: Long) = publishState()
-        override fun eventProperty(property: String, value: Boolean) = publishState()
+        override fun eventProperty(property: String, value: Boolean) {
+            if (property == "eof-reached") hasReachedEndOfFile = value
+            publishState()
+        }
         override fun eventProperty(property: String, value: String) = publishState()
 
         override fun event(eventId: Int) {
             when (eventId) {
                 MPVLib.mpvEventId.MPV_EVENT_START_FILE -> {
+                    hasReachedEndOfFile = false
+                    lastKnownPositionMs = 0L
+                    lastKnownDurationMs = 0L
                     mutableState.value = mutableState.value.copy(
                         phase = PlaybackPhase.Preparing,
                         isBuffering = true,
@@ -72,10 +81,18 @@ class MpvPlaybackEngine(
                 }
 
                 MPVLib.mpvEventId.MPV_EVENT_END_FILE -> {
-                    mutableState.value = mutableState.value.copy(
-                        phase = PlaybackPhase.Ended,
+                    val playbackState = mutableState.value
+                    val reachedRecordedDuration = lastKnownDurationMs > 0L &&
+                            lastKnownPositionMs >=
+                            (lastKnownDurationMs - NORMAL_END_TOLERANCE_MS).coerceAtLeast(0L)
+                    val endedNormally = hasReachedEndOfFile ||
+                            MPVLib.getPropertyBoolean("eof-reached") == true ||
+                            reachedRecordedDuration
+                    mutableState.value = playbackState.copy(
+                        phase = if (endedNormally) PlaybackPhase.Ended else PlaybackPhase.Error,
                         isPlaying = false,
                         isBuffering = false,
+                        errorMessage = if (endedNormally) null else "Playback failed before reaching end of file",
                     )
                 }
 
@@ -202,6 +219,7 @@ class MpvPlaybackEngine(
         MPVLib.observeProperty("time-pos", MPVLib.mpvFormat.MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("duration", MPVLib.mpvFormat.MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("pause", MPVLib.mpvFormat.MPV_FORMAT_FLAG)
+        MPVLib.observeProperty("eof-reached", MPVLib.mpvFormat.MPV_FORMAT_FLAG)
         MPVLib.observeProperty("video-params/w", MPVLib.mpvFormat.MPV_FORMAT_INT64)
         MPVLib.observeProperty("video-params/h", MPVLib.mpvFormat.MPV_FORMAT_INT64)
         MPVLib.observeProperty("demuxer-cache-duration", MPVLib.mpvFormat.MPV_FORMAT_DOUBLE)
@@ -231,8 +249,12 @@ class MpvPlaybackEngine(
 
     private fun publishState() {
         if (!initialized || released) return
-        val position = MPVLib.getPropertyDouble("time-pos") ?: 0.0
-        val duration = MPVLib.getPropertyDouble("duration") ?: 0.0
+        MPVLib.getPropertyDouble("time-pos")?.let {
+            lastKnownPositionMs = (it * 1000).toLong().coerceAtLeast(0L)
+        }
+        MPVLib.getPropertyDouble("duration")?.let {
+            lastKnownDurationMs = (it * 1000).toLong().coerceAtLeast(0L)
+        }
         val buffered = MPVLib.getPropertyDouble("demuxer-cache-duration") ?: 0.0
         val paused = MPVLib.getPropertyBoolean("pause") ?: true
         val width = MPVLib.getPropertyInt("video-params/w") ?: 0
@@ -244,10 +266,10 @@ class MpvPlaybackEngine(
         }
         mutableState.value = mutableState.value.copy(
             isPlaying = !paused,
-            isBuffering = !paused && duration > 0 && position == 0.0,
-            positionMs = (position * 1000).toLong().coerceAtLeast(0L),
-            durationMs = (duration * 1000).toLong().coerceAtLeast(0L),
-            bufferedPositionMs = ((position + buffered) * 1000).toLong().coerceAtLeast(0L),
+            isBuffering = !paused && lastKnownDurationMs > 0L && lastKnownPositionMs == 0L,
+            positionMs = lastKnownPositionMs,
+            durationMs = lastKnownDurationMs,
+            bufferedPositionMs = (lastKnownPositionMs + buffered * 1000).toLong().coerceAtLeast(0L),
             playbackSpeed = requestSpeed,
             videoWidth = lastVideoWidth,
             videoHeight = lastVideoHeight,
@@ -320,4 +342,8 @@ class MpvPlaybackEngine(
 
     private val videoOutput: String
         get() = if (SettingsRepository.enableGPUNextRenderer) "gpu-next" else "gpu"
+
+    private companion object {
+        const val NORMAL_END_TOLERANCE_MS = 3_000L
+    }
 }

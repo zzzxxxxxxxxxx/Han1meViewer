@@ -285,6 +285,7 @@ object HanimeDownloadManager {
                     HanimeDownloadWorker.HANIME_NAME to args.hanimeName,
                     HanimeDownloadWorker.VIDEO_CODE to args.videoCode,
                     HanimeDownloadWorker.COVER_URL to args.coverUrl,
+                    HanimeDownloadWorker.GROUP_ID to args.groupId,
                     HanimeDownloadWorker.REDOWNLOAD to redownload,
                     HanimeDownloadWorker.IN_WAITING_QUEUE to waiting,
                     HanimeDownloadWorker.DELETE to delete

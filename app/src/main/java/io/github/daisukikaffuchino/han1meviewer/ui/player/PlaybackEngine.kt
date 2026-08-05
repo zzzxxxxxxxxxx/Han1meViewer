@@ -50,11 +50,17 @@ data class PlaybackEngineState(
     val videoHeight: Int = 0,
     val hasRenderedFirstFrame: Boolean = false,
     val errorMessage: String? = null,
+    val isCastSupported: Boolean = false,
+    val isCasting: Boolean = false,
+    val castDeviceName: String? = null,
 )
 
 data class PlaybackRequest(
     val uri: String,
     val headers: Map<String, String> = emptyMap(),
+    val title: String = "",
+    val artworkUri: String? = null,
+    val mimeType: String? = null,
     val startPositionMs: Long = 0L,
     val playWhenReady: Boolean = true,
     val looping: Boolean = false,

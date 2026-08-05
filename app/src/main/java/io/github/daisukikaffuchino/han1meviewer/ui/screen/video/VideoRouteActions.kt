@@ -4,12 +4,14 @@ import android.content.Context
 import androidx.glance.appwidget.updateAll
 import io.github.daisukikaffuchino.han1meviewer.HAdvancedSearch
 import io.github.daisukikaffuchino.han1meviewer.HCacheManager
+import io.github.daisukikaffuchino.han1meviewer.logic.DatabaseRepo
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.getHanimeVideoDownloadLink
 import io.github.daisukikaffuchino.han1meviewer.getHanimeVideoLink
 import io.github.daisukikaffuchino.han1meviewer.logic.dao.CheckInRecordDatabase
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.CheckInRecordEntity
+import io.github.daisukikaffuchino.han1meviewer.logic.entity.download.DownloadGroupEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeVideo
 import io.github.daisukikaffuchino.han1meviewer.logic.model.SearchOption
 import io.github.daisukikaffuchino.han1meviewer.ui.activity.MainActivity
@@ -188,16 +190,38 @@ class VideoRouteActions(
 
     fun confirmPendingDownload(
         videoData: HanimeVideo,
-        pendingDownloadPrompt: DownloadPromptState?
+        pendingDownloadPrompt: DownloadPromptState?,
+        autoCreateGroup: Boolean,
     ) {
         val redownload = pendingDownloadPrompt?.oldQuality != null
         onPendingDownloadPromptChange(null)
         scope.launch {
-            enqueueDownloadWork(videoData, redownload = redownload)
+            val groupName = videoData.downloadGroupName()
+            val groupId = if (autoCreateGroup && groupName.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    DatabaseRepo.HanimeDownload.getOrCreateGroup(groupName)
+                }
+            } else {
+                pendingDownloadPrompt?.oldGroupId ?: DownloadGroupEntity.DEFAULT_GROUP_ID
+            }
+            enqueueDownloadWork(
+                videoData = videoData,
+                groupId = groupId,
+                redownload = redownload,
+            )
         }
     }
 
-    private suspend fun enqueueDownloadWork(videoData: HanimeVideo, redownload: Boolean = false) {
+    private fun HanimeVideo.downloadGroupName(): String =
+        sequenceOf(playlist?.playlistName, chineseTitle, title)
+            .firstNotNullOfOrNull { candidate -> candidate?.trim()?.takeIf(String::isNotEmpty) }
+            .orEmpty()
+
+    private suspend fun enqueueDownloadWork(
+        videoData: HanimeVideo,
+        groupId: Int,
+        redownload: Boolean = false,
+    ) {
         onRequestNotificationPermission()
         val quality = getCheckedQuality()
         withContext(Dispatchers.IO) {
@@ -211,6 +235,7 @@ class VideoRouteActions(
                 hanimeName = videoData.title,
                 videoCode = viewModel.videoCode,
                 coverUrl = videoData.coverUrl,
+                groupId = groupId,
             ),
             redownload = redownload,
         )

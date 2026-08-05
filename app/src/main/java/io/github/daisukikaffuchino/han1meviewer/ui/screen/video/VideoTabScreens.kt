@@ -47,7 +47,7 @@ fun RenderVideoIntroductionContent(
     onShowLocalMylistGate: () -> Unit,
     onQuickCheckIn: (CheckInRecordEntity) -> Unit,
     onPrepareDownload: (String, HanimeVideo?) -> Unit,
-    onConfirmDownloadPrompt: (HanimeVideo?) -> Unit,
+    onConfirmDownloadPrompt: (HanimeVideo?, Boolean) -> Unit,
     onRequestOpenOfficialDownloadPage: () -> Unit,
     onOpenWebPage: () -> Unit,
     onOpenOriginalComic: (String) -> Unit,
@@ -98,8 +98,8 @@ fun RenderVideoIntroductionContent(
             onDismissDownloadPrompt = {
                 onPendingDownloadPromptChange(null)
             },
-            onConfirmDownloadPrompt = {
-                onConfirmDownloadPrompt(video)
+            onConfirmDownloadPrompt = { autoCreateGroup ->
+                onConfirmDownloadPrompt(video, autoCreateGroup)
             },
             onRequestOpenOfficialDownloadPage = onRequestOpenOfficialDownloadPage,
             onShare = {

@@ -9,9 +9,8 @@ plugins {
     alias(libs.plugins.org.jetbrains.kotlin.plugin.serialization)
     alias(libs.plugins.com.google.devtools.ksp)
     alias(libs.plugins.compose.compiler)
-    //noinspection NewerVersionAvailable
-    id("com.mikepenz.aboutlibraries.plugin") version "14.2.0"
-    id("com.github.ben-manes.versions") version "0.56.0"
+    id("com.mikepenz.aboutlibraries.plugin") version "15.0.4"
+    id("com.github.ben-manes.versions") version "0.59.0"
 }
 
 android {
@@ -21,8 +20,8 @@ android {
         applicationId = "io.github.daisukikaffuchino.han1meviewer"
         minSdk = 29
         targetSdk = 37
-        versionCode = 260803
-        versionName = "26.3.1"
+        versionCode = 260805
+        versionName = "26.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -94,6 +93,12 @@ android {
         generateLocaleConfig = true
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
 }
 
 kotlin {
@@ -157,6 +162,7 @@ dependencies {
 
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.cast)
     implementation(libs.mpv.lib)
 
     ksp(libs.room.compiler)

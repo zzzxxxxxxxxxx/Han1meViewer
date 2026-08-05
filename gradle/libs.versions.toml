@@ -28,7 +28,7 @@ workRuntimeKtx = "2.11.2"
 datastorePreferences = "1.2.1"
 datetime = "0.8.0"
 serialization = "1.11.0"
-jsoup = "1.22.2"
+jsoup = "1.23.1"
 retrofit = "3.0.0"
 converterSerialization = "1.0.0"
 coil = "2.7.0"
@@ -97,6 +97,7 @@ test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "testJ
 # video
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "exoplayer" }
 media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "exoplayer" }
+media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "exoplayer" }
 mpv-lib = { group = "com.github.abdallahmehiz", name = "mpv-android", version.ref = "mpv" }
 
 # Other

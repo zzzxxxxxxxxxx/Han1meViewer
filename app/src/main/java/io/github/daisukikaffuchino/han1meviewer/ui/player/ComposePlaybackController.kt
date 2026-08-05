@@ -16,10 +16,12 @@ data class PlaybackQuality(
     val label: String,
     val uri: String,
     val headers: Map<String, String> = emptyMap(),
+    val mimeType: String? = null,
 )
 
 data class ComposePlaybackState(
     val title: String = "",
+    val artworkUri: String? = null,
     val qualities: List<PlaybackQuality> = emptyList(),
     val selectedQualityIndex: Int = -1,
     val engine: PlaybackEngineState = PlaybackEngineState(),
@@ -47,6 +49,7 @@ class ComposePlaybackController(
         title: String,
         qualities: List<PlaybackQuality>,
         preferredQuality: String? = null,
+        artworkUri: String? = null,
         startPositionMs: Long = 0L,
         playWhenReady: Boolean = true,
     ) {
@@ -55,11 +58,12 @@ class ComposePlaybackController(
             ?: qualities.lastIndex
         mutableState.value = ComposePlaybackState(
             title = title,
+            artworkUri = artworkUri,
             qualities = qualities,
             selectedQualityIndex = selectedIndex,
         )
         if (selectedIndex >= 0) {
-            loadQuality(selectedIndex, startPositionMs, playWhenReady)
+            loadQuality(selectedIndex, startPositionMs, playWhenReady, artworkUri)
         }
     }
 
@@ -77,6 +81,13 @@ class ComposePlaybackController(
 
     fun togglePlayPause() {
         if (mutableState.value.engine.isPlaying) pause() else play()
+    }
+
+    fun replay() {
+        val selectedIndex = mutableState.value.selectedQualityIndex
+        if (selectedIndex in mutableState.value.qualities.indices) {
+            loadQuality(selectedIndex, positionMs = 0L, playWhenReady = true)
+        }
     }
 
     fun seekTo(positionMs: Long) = playbackEngine.seekTo(positionMs)
@@ -99,13 +110,21 @@ class ComposePlaybackController(
         scope.coroutineContext.cancel()
     }
 
-    private fun loadQuality(index: Int, positionMs: Long, playWhenReady: Boolean) {
+    private fun loadQuality(
+        index: Int,
+        positionMs: Long,
+        playWhenReady: Boolean,
+        artworkUri: String? = mutableState.value.artworkUri,
+    ) {
         val quality = mutableState.value.qualities[index]
         mutableState.update { it.copy(selectedQualityIndex = index) }
         playbackEngine.load(
             PlaybackRequest(
                 uri = quality.uri,
                 headers = quality.headers,
+                title = mutableState.value.title,
+                artworkUri = artworkUri,
+                mimeType = quality.mimeType,
                 startPositionMs = positionMs,
                 playWhenReady = playWhenReady,
             )

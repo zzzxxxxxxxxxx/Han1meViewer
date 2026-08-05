@@ -34,7 +34,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
-import io.github.daisukikaffuchino.han1meviewer.ui.component.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -75,8 +74,9 @@ import io.github.daisukikaffuchino.han1meviewer.logic.model.HanimeInfo
 import io.github.daisukikaffuchino.han1meviewer.logic.model.OnlineWatchHistorySort
 import io.github.daisukikaffuchino.han1meviewer.logic.state.PageLoadingState
 import io.github.daisukikaffuchino.han1meviewer.logic.state.WebsiteState
-import io.github.daisukikaffuchino.han1meviewer.ui.component.ConfirmDialog
 import io.github.daisukikaffuchino.han1meviewer.ui.component.CardContainerSurface
+import io.github.daisukikaffuchino.han1meviewer.ui.component.ConfirmDialog
+import io.github.daisukikaffuchino.han1meviewer.ui.component.FilledIconButton
 import io.github.daisukikaffuchino.han1meviewer.ui.component.LoadMoreFooter
 import io.github.daisukikaffuchino.han1meviewer.ui.component.PageContent
 import io.github.daisukikaffuchino.han1meviewer.ui.component.VideoCardItem
@@ -88,14 +88,15 @@ import io.github.daisukikaffuchino.han1meviewer.ui.component.lazy.LazyVerticalGr
 import io.github.daisukikaffuchino.han1meviewer.ui.preview.ComponentPreview
 import io.github.daisukikaffuchino.han1meviewer.ui.preview.fakeHomePageVideos
 import io.github.daisukikaffuchino.han1meviewer.ui.screen.rememberVideoGridColumns
-import io.github.daisukikaffuchino.han1meviewer.ui.theme.SpacingNormal
 import io.github.daisukikaffuchino.han1meviewer.ui.theme.HanimeDefaults
+import io.github.daisukikaffuchino.han1meviewer.ui.theme.SpacingNormal
 import io.github.daisukikaffuchino.han1meviewer.ui.theme.shapeByInteraction
 import io.github.daisukikaffuchino.utils.VibrationUtil
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -344,10 +345,26 @@ private fun OnlineWatchHistoryScreen(
         }
     }
 
-    LaunchedEffect(gridState.canLoadMore(items, state), isLoadingMore) {
-        if (gridState.canLoadMore(items, state) && !isLoadingMore) {
-            onLoadMore()
+    LaunchedEffect(gridState, items.size, state, isLoadingMore) {
+        if (
+            items.isEmpty() ||
+            isLoadingMore ||
+            state is PageLoadingState.Loading ||
+            state is PageLoadingState.NoMoreData ||
+            state is PageLoadingState.Error
+        ) {
+            return@LaunchedEffect
         }
+
+        snapshotFlow {
+            val layoutInfo = gridState.layoutInfo
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= layoutInfo.totalItemsCount - 4
+        }
+            .distinctUntilChanged()
+            .first { it }
+
+        onLoadMore()
     }
 
     LaunchedEffect(gridState) {
@@ -382,32 +399,7 @@ private fun OnlineWatchHistoryScreen(
         onDismiss = { pendingDelete = null },
     )
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = sortBarVisible) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OnlineHistorySortChip(
-                    text = stringResource(R.string.sort_by_newest),
-                    selected = sort == OnlineWatchHistorySort.Latest,
-                    onClick = { onRefresh(OnlineWatchHistorySort.Latest) },
-                )
-                OnlineHistorySortChip(
-                    text = stringResource(R.string.popular),
-                    selected = sort == OnlineWatchHistorySort.Popular,
-                    onClick = { onRefresh(OnlineWatchHistorySort.Popular) },
-                )
-                OnlineHistorySortChip(
-                    text = stringResource(R.string.sort_by_oldest),
-                    selected = sort == OnlineWatchHistorySort.Oldest,
-                    onClick = { onRefresh(OnlineWatchHistorySort.Oldest) },
-                )
-            }
-        }
-
+    Box(modifier = Modifier.fillMaxSize()) {
         PullToRefreshBox(
             isRefreshing = refreshing,
             state = refreshState,
@@ -417,7 +409,9 @@ private fun OnlineWatchHistoryScreen(
                 PullToRefreshDefaults.LoadingIndicator(
                     state = refreshState,
                     isRefreshing = refreshing,
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 64.dp),
                 )
             }
         ) {
@@ -455,6 +449,41 @@ private fun OnlineWatchHistoryScreen(
                 )
             }
         }
+
+        AnimatedVisibility(
+            visible = sortBarVisible,
+            modifier = Modifier.align(Alignment.TopCenter),
+            enter = fadeIn() + slideInVertically { -it },
+            exit = fadeOut() + slideOutVertically { -it },
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.66f),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OnlineHistorySortChip(
+                        text = stringResource(R.string.sort_by_newest),
+                        selected = sort == OnlineWatchHistorySort.Latest,
+                        onClick = { onRefresh(OnlineWatchHistorySort.Latest) },
+                    )
+                    OnlineHistorySortChip(
+                        text = stringResource(R.string.popular),
+                        selected = sort == OnlineWatchHistorySort.Popular,
+                        onClick = { onRefresh(OnlineWatchHistorySort.Popular) },
+                    )
+                    OnlineHistorySortChip(
+                        text = stringResource(R.string.sort_by_oldest),
+                        selected = sort == OnlineWatchHistorySort.Oldest,
+                        onClick = { onRefresh(OnlineWatchHistorySort.Oldest) },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -475,11 +504,21 @@ private fun OnlineWatchHistoryGrid(
             columns = GridCells.Fixed(videoColumns),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(SpacingNormal),
+            contentPadding = PaddingValues(
+                start = SpacingNormal,
+                top = 64.dp,
+                end = SpacingNormal,
+                bottom = SpacingNormal,
+            ),
             horizontalArrangement = Arrangement.spacedBy(SpacingNormal),
             verticalArrangement = Arrangement.spacedBy(SpacingNormal),
+            enableItemAnimation = false,
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(
+                key = "online_history_count",
+                span = { GridItemSpan(maxLineSpan) },
+                contentType = "header",
+            ) {
                 Text(
                     text = stringResource(R.string.watch_history_total_count, items.size),
                     style = MaterialTheme.typography.labelLarge,
@@ -487,7 +526,11 @@ private fun OnlineWatchHistoryGrid(
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 )
             }
-            items(items, key = { it.videoCode }) { item ->
+            items(
+                items = items,
+                key = { it.videoCode },
+                contentType = { "video" },
+            ) { item ->
                 VideoCardItem(
                     videoItem = item,
                     onClickVideosItem = { onOpenVideo(item) },
@@ -495,7 +538,11 @@ private fun OnlineWatchHistoryGrid(
                 )
             }
             if (items.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(
+                    key = "online_history_footer",
+                    span = { GridItemSpan(maxLineSpan) },
+                    contentType = "footer",
+                ) {
                     LoadMoreFooter(
                         state = state,
                         loadedPage = loadedPageCount,
@@ -509,18 +556,6 @@ private fun OnlineWatchHistoryGrid(
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
-}
-
-private fun LazyGridState.canLoadMore(
-    items: List<HanimeInfo>,
-    state: PageLoadingState<*>,
-): Boolean {
-    if (items.isEmpty()) return false
-    if (state is PageLoadingState.Loading || state is PageLoadingState.NoMoreData || state is PageLoadingState.Error) {
-        return false
-    }
-    val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return false
-    return lastVisible >= layoutInfo.totalItemsCount - 4
 }
 
 @Composable

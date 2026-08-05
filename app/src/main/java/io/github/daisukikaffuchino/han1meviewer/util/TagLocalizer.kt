@@ -6,6 +6,8 @@ import io.github.daisukikaffuchino.utils.loadAssetAs
 
 object TagLocalizer {
 
+    private const val SEARCH_PREFIX = "search."
+
     private data class TagMappings(
         val labels: Map<String, String>,
         val searchKeys: Map<String, String>,
@@ -37,16 +39,25 @@ object TagLocalizer {
         return tags.map(::localizeTag)
     }
 
-    fun localizeTag(tag: String): String = tagMappings.labels[tag] ?: tag
+    fun localizeTag(tag: String): String {
+        val normalizedTag = tag.normalizeTag()
+        return tagMappings.labels[normalizedTag] ?: normalizedTag
+    }
 
-    fun resolveSearchKey(tag: String): String = tagMappings.searchKeys[tag] ?: tag
+    fun resolveSearchKey(tag: String): String {
+        val normalizedTag = tag.normalizeTag()
+        return tagMappings.searchKeys[normalizedTag] ?: normalizedTag
+    }
 
     private fun buildTagMappings(options: List<SearchOption>): TagMappings {
         val labels = mutableMapOf<String, String>()
         val searchKeys = mutableMapOf<String, String>()
         options.forEach { option ->
-            val label = option.value.takeIf { it.isNotBlank() } ?: return@forEach
-            val searchKey = option.searchKey?.takeIf { it.isNotBlank() } ?: return@forEach
+            val label = option.value.normalizeTag().takeIf { it.isNotBlank() } ?: return@forEach
+            val searchKey = option.searchKey
+                ?.normalizeTag()
+                ?.takeIf { it.isNotBlank() }
+                ?: return@forEach
             listOfNotNull(
                 option.searchKey,
                 option.name,
@@ -55,10 +66,13 @@ object TagLocalizer {
                 option.lang?.en,
                 option.lang?.ja,
             ).forEach { rawTag ->
-                labels.putIfAbsent(rawTag, label)
-                searchKeys.putIfAbsent(rawTag, searchKey)
+                val normalizedTag = rawTag.normalizeTag()
+                labels.putIfAbsent(normalizedTag, label)
+                searchKeys.putIfAbsent(normalizedTag, searchKey)
             }
         }
         return TagMappings(labels = labels, searchKeys = searchKeys)
     }
+
+    private fun String.normalizeTag(): String = removePrefix(SEARCH_PREFIX)
 }

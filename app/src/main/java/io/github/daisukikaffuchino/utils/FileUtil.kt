@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.content.ContentResolver
 import android.content.Context
+import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toBitmapOrNull
 import androidx.core.net.toUri
@@ -49,12 +50,12 @@ fun Drawable.saveTo(
 }
 
 /**
- * Validates a downloaded video and returns a URI for LocalUriHandler.
+ * Validates a downloaded video and returns a shareable URI.
  */
 fun Context.getDownloadedHanimeVideoUri(
     uri: String,
     onFileNotFound: (() -> Unit)? = null,
-): String? {
+): Uri? {
     val videoUri = uri.toUri()
     if (videoUri.scheme == ContentResolver.SCHEME_CONTENT) {
         try {
@@ -68,7 +69,7 @@ fun Context.getDownloadedHanimeVideoUri(
             onFileNotFound?.invoke()
             return null
         }
-        return videoUri.toString()
+        return videoUri
     }
 
     val videoFile = File(videoUri.path ?: "")
@@ -76,7 +77,7 @@ fun Context.getDownloadedHanimeVideoUri(
         onFileNotFound?.invoke()
         return null
     }
-    return FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, videoFile).toString()
+    return FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, videoFile)
 }
 
 @OptIn(ExperimentalSerializationApi::class)

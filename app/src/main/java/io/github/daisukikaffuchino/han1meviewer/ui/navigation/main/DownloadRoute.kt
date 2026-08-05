@@ -1,5 +1,7 @@
 package io.github.daisukikaffuchino.han1meviewer.ui.navigation.main
 
+import android.content.ClipData
+import android.content.Intent
 import io.github.daisukikaffuchino.utils.LogUtil
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -8,7 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
@@ -37,7 +39,7 @@ fun DownloadRouteScreen(
     onNavigateToLocalVideo: (String, String?) -> Unit,
 ) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
+    val externalPlayerChooserTitle = stringResource(R.string.ext_player)
     val viewModel: DownloadViewModel = viewModel()
     val scope = rememberCoroutineScope()
     val dao = remember { DownloadDatabase.instance.hanimeDownloadDao }
@@ -51,9 +53,11 @@ fun DownloadRouteScreen(
             is DownloadEvent.OnPauseAll -> event.items.forEach { entity ->
                 if (entity.isDownloading) HanimeDownloadManager.stopTask(entity)
             }
+
             is DownloadEvent.OnResumeAll -> event.items.forEach { entity ->
                 if (!entity.isDownloading) HanimeDownloadManager.resumeTask(entity)
             }
+
             is DownloadEvent.OnPauseItem -> HanimeDownloadManager.stopTask(event.item)
             is DownloadEvent.OnResumeItem -> HanimeDownloadManager.resumeTask(event.item)
             is DownloadEvent.OnDeleteDownloadingItem -> HanimeDownloadManager.deleteTask(event.item)
@@ -78,7 +82,18 @@ fun DownloadRouteScreen(
                     showVideoNotExistConfirm = event.video
                 }
                 if (externalUri != null) {
-                    runCatching { uriHandler.openUri(externalUri) }
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(externalUri, "video/*")
+                        clipData = ClipData.newRawUri("video", externalUri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    val chooser = Intent.createChooser(
+                        intent,
+                        externalPlayerChooserTitle,
+                    ).apply {
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    runCatching { context.startActivity(chooser) }
                         .onFailure { SonnerToast.warning(R.string.action_not_support) }
                 }
             }
@@ -96,10 +111,15 @@ fun DownloadRouteScreen(
 
             is DownloadEvent.OnCreateGroup -> {
                 if (event.name.isBlank()) {
-                SonnerToast.warning(application.getString(R.string.group_name_empty))
+                    SonnerToast.warning(application.getString(R.string.group_name_empty))
                 } else {
                     viewModel.createNewGroup(event.name)
-                SonnerToast.success(application.getString(R.string.create_group_success, event.name))
+                    SonnerToast.success(
+                        application.getString(
+                            R.string.create_group_success,
+                            event.name
+                        )
+                    )
                 }
             }
 

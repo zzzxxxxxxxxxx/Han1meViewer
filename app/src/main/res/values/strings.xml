@@ -272,6 +272,7 @@ Some mirrors may not support login, may not share cookies, may fail verification
     <string name="name_with_colon">Name:</string>
     <string name="quality_with_colon">Quality:</string>
     <string name="after_download_tips">After downloading, you can find the downloaded video in the "Download" interface. Detailed storage paths are available in the "Settings" interface.</string>
+    <string name="auto_create_same_name_download_group">Automatically create a group with the same name</string>
     <string name="restart_or_not_working">Modifying %s requires restarting the program, otherwise it will not take effect!</string>
     <string name="sure_to_clear">Are you sure you want to clear?</string>
     <string name="sure_to_clear_cache">Are you sure you want to clear the cache?</string>
@@ -334,6 +335,13 @@ Recommendations are as follows:\n
     <string name="apply_deep_links_summary">After application, quickly jump to this app when opening relevant web pages</string>
     <string name="apply_deep_links_tips">MIUI has hidden this interface, so you need to open it from here and then add the link.</string>
     <string name="switch_player_kernel">Switch Player Kernel</string>
+    <string name="enable_google_cast">Enable Google Cast</string>
+    <string name="enable_google_cast_summary">Cast to Android TV and other supported devices</string>
+    <string name="google_cast_unavailable_summary">This device does not have Google Play services, so Google Cast is unavailable</string>
+    <string name="google_cast_warning">Because your phone does not continuously transmit the picture, Cloudflare verification, VPN, and Hosts settings on the sender have no effect on the receiver. Unless a network-wide router sends the receiver through the proxy, do not cast sources that require Cloudflare verification; playback will fail.</string>
+    <string name="player_settings_controls">Player Controls</string>
+    <string name="player_settings_casting">Casting</string>
+    <string name="settings_tip">Tip:</string>
     <string name="switch_to_year">Switch to Y</string>
     <string name="switch_to_year_month">Switch to YM</string>
     <string name="subscribe">Subscribe</string>
@@ -658,6 +666,7 @@ Recommendations are as follows:\n
     <string name="invalid_ip_or_port">Invalid IP(v4) or port (0..65535)</string>
     <string name="click_to_restart">Click to restart</string>
     <string name="replay">Replay</string>
+    <string name="playback_finished">Playback finished</string>
     <string name="video_loading_failed">Video loading failed</string>
     <string name="update_available_title">New version %1$s available</string>
     <string name="force_update_notice">This is a required update.</string>
@@ -738,6 +747,8 @@ Recommendations are as follows:\n
     <string name="player_gesture_progress">Progress</string>
     <string name="player_play_from_beginning">Play from beginning</string>
     <string name="player_untitled_video">Untitled</string>
+    <string name="player_cast_device">Google Cast</string>
+    <string name="player_casting_to">Casting to %1$s</string>
     <string name="perception">Sensing</string>
     <string-array name="loading_hints">
         <item>Hmph! I-it\'s not like I kept you waiting! The router just sneezed…</item>

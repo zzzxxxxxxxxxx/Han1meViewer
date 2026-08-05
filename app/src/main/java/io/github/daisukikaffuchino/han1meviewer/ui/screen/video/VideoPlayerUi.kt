@@ -1,10 +1,14 @@
 package io.github.daisukikaffuchino.han1meviewer.ui.screen.video
 
+import android.content.Context
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.StateListDrawable
 import android.os.Build
 import android.os.SystemClock
 import android.text.format.DateFormat
+import android.util.StateSet
 import android.view.HapticFeedbackConstants
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -34,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -49,7 +54,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -91,10 +95,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
+import androidx.mediarouter.app.MediaRouteButton
 import coil3.compose.AsyncImage
+import com.google.android.gms.cast.framework.CastButtonFactory
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.HKeyframeEntity
 import io.github.daisukikaffuchino.han1meviewer.ui.component.FilledIconButton
+import io.github.daisukikaffuchino.han1meviewer.ui.component.FilledTonalButton
 import io.github.daisukikaffuchino.han1meviewer.ui.component.FilledTonalIconButton
 import io.github.daisukikaffuchino.han1meviewer.ui.component.IconButton
 import io.github.daisukikaffuchino.han1meviewer.ui.player.PlaybackEngine
@@ -126,12 +135,17 @@ fun VideoPlayerUi(
     showControls: Boolean = true,
     isFullscreen: Boolean = false,
     isPlaying: Boolean = false,
+    isPlaybackEnded: Boolean = false,
+    showCastButton: Boolean = false,
+    isCasting: Boolean = false,
+    castDeviceName: String? = null,
     isLocked: Boolean = false,
     showPoster: Boolean = false,
     showResumeButton: Boolean = false,
     showLoading: Boolean = false,
     showRetry: Boolean = false,
     onPlayClick: () -> Unit = {},
+    onReplay: () -> Unit = {},
     onBackClick: () -> Unit = {},
     onHomeClick: () -> Unit = {},
     onFullscreenClick: () -> Unit = {},
@@ -318,7 +332,7 @@ fun VideoPlayerUi(
                     .aspectRatio(safeAspectRatio)
             }
 
-            if (playbackEngine != null) {
+            if (playbackEngine != null && !isCasting) {
                 key(playbackEngine, safeAspectRatio) {
                     Box(
                         modifier = videoModifier
@@ -357,6 +371,24 @@ fun VideoPlayerUi(
                 Box(
                     modifier = videoModifier.background(Color.Black)
                 )
+            }
+
+            if (isCasting) {
+                Surface(
+                    modifier = Modifier.offset(y = (-48).dp),
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color.Black.copy(alpha = 0.72f),
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.player_casting_to,
+                            castDeviceName ?: stringResource(R.string.player_cast_device),
+                        ),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    )
+                }
             }
         }
         Box(
@@ -659,6 +691,22 @@ fun VideoPlayerUi(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
+                    if (showCastButton) {
+                        AndroidView(
+                            modifier = Modifier.size(24.dp),
+                            factory = { context ->
+                                MediaRouteButton(context).also { button ->
+                                    button.minimumWidth = 0
+                                    button.minimumHeight = 0
+                                    button.contentDescription = context.getString(R.string.enable_google_cast)
+                                    CastButtonFactory.setUpMediaRouteButton(context, button)
+                                    button.setRemoteIndicatorDrawable(createGoogleCastIndicator(context))
+                                }
+                            },
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
                     if (isFullscreen) {
                         PlayerMenuChip(
                             label = hKeyframeLabel,
@@ -737,6 +785,7 @@ fun VideoPlayerUi(
                 !isLocked &&
                         activeSidePanel == null &&
                         gestureType == null &&
+                        !isPlaybackEnded &&
                         (!isPlaying || effectiveShowControls),
             enter = fadeIn(),
             exit = fadeOut(),
@@ -985,6 +1034,44 @@ fun VideoPlayerUi(
             }
         }
 
+        AnimatedVisibility(
+            visible = isPlaybackEnded && activeSidePanel == null && !isLocked,
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = HanimeDefaults.Colors.pageSurface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                shape = RoundedCornerShape(28.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = stringResource(R.string.playback_finished),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    FilledTonalButton(onClick = onReplay) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_refresh),
+                            contentDescription = null,
+                        )
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Text(stringResource(R.string.replay))
+                    }
+                }
+            }
+        }
+
         /**
          * Retry
          */
@@ -1150,6 +1237,26 @@ fun VideoPlayerUi(
     }
 }
 
+private fun createGoogleCastIndicator(context: Context): Drawable = StateListDrawable().apply {
+    addState(
+        intArrayOf(android.R.attr.state_checked),
+        whiteDrawable(context, androidx.media3.cast.R.drawable.media_route_button_connected),
+    )
+    addState(
+        intArrayOf(android.R.attr.state_checkable),
+        whiteDrawable(context, androidx.media3.cast.R.drawable.media_route_button_disconnected),
+    )
+    addState(
+        StateSet.WILD_CARD,
+        whiteDrawable(context, androidx.media3.cast.R.drawable.media_route_button_disconnected),
+    )
+}
+
+private fun whiteDrawable(context: Context, drawableRes: Int): Drawable =
+    requireNotNull(ContextCompat.getDrawable(context, drawableRes)).mutate().also { drawable ->
+        DrawableCompat.setTint(drawable, android.graphics.Color.WHITE)
+    }
+
 @Composable
 private fun PlayerMenuChip(
     label: String,
@@ -1231,7 +1338,7 @@ private fun BoxScope.PlayerSidePanelSheet(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 6.dp, vertical = 12.dp),
+                .padding(horizontal = 6.dp, vertical = 6.dp),
         ) {
             if (isHKeyframePanel && hKeyframes.isNotEmpty()) {
                 itemsIndexed(hKeyframes) { index, keyframe ->
@@ -1248,8 +1355,8 @@ private fun BoxScope.PlayerSidePanelSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelected(index) }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1258,36 +1365,52 @@ private fun BoxScope.PlayerSidePanelSheet(
                             Text(
                                 text = marker,
                                 color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.labelMedium,
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = time,
                                 color = Color.White,
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                             )
+                            if (isHKeyframeLocal) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = { editingKeyframe = keyframe },
+                                    modifier = Modifier.size(28.dp),
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        contentColor = Color.White.copy(alpha = 0.76f),
+                                    ),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_edit),
+                                        contentDescription = stringResource(R.string.edit),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { deletingKeyframe = keyframe },
+                                    modifier = Modifier.size(28.dp),
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        contentColor = Color.White.copy(alpha = 0.76f),
+                                    ),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_delete),
+                                        contentDescription = stringResource(R.string.delete),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
                         }
                         keyframe.prompt?.takeIf(String::isNotBlank)?.let { prompt ->
                             Text(
                                 text = prompt,
                                 color = Color.White.copy(alpha = 0.68f),
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                        }
-                        if (isHKeyframeLocal) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                            ) {
-                                TextButton(onClick = { editingKeyframe = keyframe }) {
-                                    Text(stringResource(R.string.edit), color = Color.White)
-                                }
-                                TextButton(onClick = { deletingKeyframe = keyframe }) {
-                                    Text(stringResource(R.string.delete), color = Color.White)
-                                }
-                            }
                         }
                     }
                 }

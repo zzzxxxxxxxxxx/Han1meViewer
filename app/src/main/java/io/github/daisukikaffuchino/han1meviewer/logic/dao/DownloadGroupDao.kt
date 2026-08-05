@@ -60,6 +60,9 @@ interface DownloadGroupDao {
     @Query("SELECT * FROM download_groups ORDER BY orderIndex ASC")
     suspend fun getAllGroupsOnce(): List<DownloadGroupEntity>
 
+    @Query("SELECT * FROM download_groups WHERE name = :name LIMIT 1")
+    suspend fun getGroupByName(name: String): DownloadGroupEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(groups: List<DownloadGroupEntity>)
 
@@ -77,6 +80,17 @@ interface DownloadGroupDao {
      */
     @Query("SELECT MAX(orderIndex) FROM download_groups")
     suspend fun getMaxOrderIndex(): Int?
+
+    @Transaction
+    suspend fun getOrCreateGroup(name: String): Int {
+        getGroupByName(name)?.let { return it.id }
+        return insert(
+            DownloadGroupEntity(
+                name = name,
+                orderIndex = (getMaxOrderIndex() ?: 0) + 1,
+            )
+        ).toInt()
+    }
 
     /**
      * 将某个分组下的所有视频移到默认分组 (DEFAULT_GROUP_ID) 下。

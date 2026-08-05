@@ -270,6 +270,7 @@
     <string name="name_with_colon">名稱：</string>
     <string name="quality_with_colon">畫質：</string>
     <string name="after_download_tips">下載完成後，可以在「下載」頁面找到下載後的影片，「設定」頁面中有詳細儲存路徑</string>
+    <string name="auto_create_same_name_download_group">自動建立同名分組</string>
     <string name="restart_or_not_working">修改 %s 需要重新啟動程式，否則不會生效！</string>
     <string name="restart_needed">需要重新啟動程式，否則不會生效！</string>
     <string name="sure_to_clear">確定要清除嗎？</string>
@@ -326,6 +327,13 @@
     <string name="apply_deep_links_summary">套用後，開啟相關網頁時可快速跳轉至此 App</string>
     <string name="apply_deep_links_tips">MIUI 隱藏了此介面，因此你需要從這裡開啟並新增連結</string>
     <string name="switch_player_kernel">切換播放器核心</string>
+    <string name="enable_google_cast">啟用 Google Cast</string>
+    <string name="enable_google_cast_summary">可以讓你在 Android TV 等支援的裝置上進行投放</string>
+    <string name="google_cast_unavailable_summary">此裝置缺少 Google Play 服務，無法使用 Google Cast</string>
+    <string name="google_cast_warning">由於並不依賴手機持續傳輸畫面，傳送端的 Cloudflare 驗證、VPN 和 Hosts 等設定對接收端完全不起作用。除非你設定了全域軟路由，能讓接收端裝置自動走代理通道，否則不要嘗試播放需要 Cloudflare 驗證的影片來源，投放必然失敗。</string>
+    <string name="player_settings_controls">播放器控制</string>
+    <string name="player_settings_casting">投放</string>
+    <string name="settings_tip">提示：</string>
     <string name="switch_to_year">切換至年份</string>
     <string name="switch_to_year_month">切換至年月</string>
     <string name="subscribe">追蹤</string>
@@ -629,6 +637,7 @@
     <string name="invalid_ip_or_port">無效的 IPv4 位址或連接埠 (0..65535)</string>
     <string name="click_to_restart">點擊重新開始</string>
     <string name="replay">重播</string>
+    <string name="playback_finished">影片播放完畢</string>
     <string name="video_loading_failed">影片載入失敗</string>
     <string name="update_available_title">發現新版本 %1$s</string>
     <string name="force_update_notice">本次為強制更新</string>
@@ -708,6 +717,8 @@
     <string name="player_gesture_progress">進度</string>
     <string name="player_play_from_beginning">從頭開始播放</string>
     <string name="player_untitled_video">未命名影片</string>
+    <string name="player_cast_device">Google Cast</string>
+    <string name="player_casting_to">正在投放至 %1$s</string>
     <string name="perception">感知</string>
     <string-array name="loading_hints">
         <item>哼！才、才沒有讓你等很久啦！是路由器剛打了個噴嚏啦……</item>

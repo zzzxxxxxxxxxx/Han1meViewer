@@ -8,6 +8,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.ui.player.PlayerDefaults
@@ -49,6 +51,9 @@ fun PlayerSettingsRouteScreen(
         onKernelChange = {
             coroutineScope.launch { SettingsRepository.update { settings -> settings.copy(playerKernel = io.github.daisukikaffuchino.han1meviewer.logic.model.PlayerKernel.fromValue(it)) } }
         },
+        onEnableGoogleCastChange = {
+            coroutineScope.launch { SettingsRepository.update { settings -> settings.copy(enableGoogleCast = it) } }
+        },
         onShowBottomProgressChange = {
             coroutineScope.launch { SettingsRepository.update { settings -> settings.copy(showBottomProgress = it) } }
         },
@@ -76,6 +81,8 @@ private fun buildPlayerSettingsUiState(context: Context): PlayerSettingsUiState 
             ?: PlayerDefaults.DEFAULT_SPEED_INDEX
     ) { speedLabels[PlayerDefaults.DEFAULT_SPEED_INDEX] }
     val longPressDisplay = context.getString(R.string.d_speed_times, currentLongPressSpeed)
+    val googleCastAvailable = GoogleApiAvailability.getInstance()
+        .isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
     return PlayerSettingsUiState(
         kernel = kernel,
         kernelDisplay = kernel,
@@ -85,6 +92,8 @@ private fun buildPlayerSettingsUiState(context: Context): PlayerSettingsUiState 
         } else {
             context.getString(R.string.mpv_settings_disabled_summary)
         },
+        enableGoogleCast = SettingsRepository.enableGoogleCast,
+        googleCastAvailable = googleCastAvailable,
         showBottomProgress = SettingsRepository.showBottomProgress,
         playerSpeed = currentSpeed.toString(),
         playerSpeedLabel = speedDisplay,
