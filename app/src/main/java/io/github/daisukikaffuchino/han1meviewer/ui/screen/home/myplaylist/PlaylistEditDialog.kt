@@ -50,11 +50,13 @@ fun PlaylistEditDialog(
             }
         },
         confirmButton = {
+            // 网页端不接受空标题清单，本地模式同样拦截
             TextButton(
                 onClick = {
                     onConfirm(playlistTitle, playlistDescription)
                     onDismiss()
                 },
+                enabled = playlistTitle.isNotBlank(),
             ) {
                 Text(stringResource(R.string.confirm))
             }

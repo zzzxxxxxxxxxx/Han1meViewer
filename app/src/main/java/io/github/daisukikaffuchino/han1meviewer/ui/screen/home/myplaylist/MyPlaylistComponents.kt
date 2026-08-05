@@ -1,5 +1,6 @@
 package io.github.daisukikaffuchino.han1meviewer.ui.screen.home.myplaylist
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
@@ -83,14 +84,25 @@ fun PlaylistItem(
             ),
         ) {
             Box(modifier = Modifier.height(100.dp)) {
-                RetryableImage(
-                    model = playlist.coverUrl ?: "",
-                    contentDescription = playlist.title,
-                    placeholder = painterResource(R.drawable.h_chan_loading),
-                    error = painterResource(R.drawable.h_chan_load_failed),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                val coverUrl = playlist.coverUrl?.takeIf { it.isNotBlank() }
+                if (coverUrl != null) {
+                    RetryableImage(
+                        model = coverUrl,
+                        contentDescription = playlist.title,
+                        placeholder = painterResource(R.drawable.h_chan_loading),
+                        error = painterResource(R.drawable.h_chan_load_failed),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    // 空清单无封面：显示与网页端一致的占位图（本地资源，离线可用）
+                    Image(
+                        painter = painterResource(R.drawable.h_chan_playlist_placeholder),
+                        contentDescription = playlist.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
 
                 Box(
                     modifier = Modifier

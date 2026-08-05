@@ -511,7 +511,10 @@ object MylistSyncManager {
     }
 
     private suspend fun pushDirtyPlaylists(token: String?) {
+        // 空标题清单网页端不接受（createPlaylist / modifyPlaylist 必失败），
+        // 本地保留可用，过滤后不推送；用户补上标题后（变为非空）自动恢复同步。
         val dirty = DatabaseRepo.LocalMylist.getDirtyPlaylists()
+            .filter { it.name.isNotBlank() }
         if (dirty.isEmpty()) return
         if (!SettingsRepository.isAlreadyLogin) return
         val userId = SettingsRepository.savedUserId
