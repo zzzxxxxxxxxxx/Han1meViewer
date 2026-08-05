@@ -13,6 +13,9 @@ import io.github.daisukikaffuchino.han1meviewer.logic.model.Playlists
 import io.github.daisukikaffuchino.han1meviewer.logic.state.PageLoadingState
 import io.github.daisukikaffuchino.han1meviewer.logic.state.WebsiteState
 import io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.AppViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -32,6 +35,14 @@ import kotlinx.coroutines.sync.withLock
 object MylistSyncManager {
 
     private val syncMutex = Mutex()
+
+    private val _isSyncing = MutableStateFlow(false)
+
+    /**
+     * 当前是否正在执行同步。本地化模式列表页据此在同步期间显示加载动画，
+     * 避免同步完成前闪现空态或旧数据误导用户。
+     */
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     /**
      * 清空本地全部收藏 / 稍后观看 / 播放清单数据。
@@ -55,6 +66,7 @@ object MylistSyncManager {
      */
     suspend fun sync() {
         if (!syncMutex.tryLock()) return
+        _isSyncing.value = true
         try {
             if (!SettingsRepository.isAlreadyLogin) return
             if (!SettingsRepository.isLocalMylistEnabled) return
@@ -71,6 +83,7 @@ object MylistSyncManager {
         } catch (t: Throwable) {
             LogUtil.e("mylist_sync_failed", t)
         } finally {
+            _isSyncing.value = false
             syncMutex.unlock()
         }
     }

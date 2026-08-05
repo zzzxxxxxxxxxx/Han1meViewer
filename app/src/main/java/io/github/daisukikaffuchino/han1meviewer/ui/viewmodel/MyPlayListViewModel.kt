@@ -105,6 +105,14 @@ class MyPlayListViewModel : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlaylistUiState())
 
     init {
+        // 登录+开关：进入页面即触发同步并在首帧前置位 isSyncing，
+        // 同步期间列表显示加载动画，避免闪现空态或旧数据误导用户
+        // （路由层 LaunchedEffect 仍会触发 sync，tryLock 幂等无副作用）。
+        viewModelScope.launch {
+            if (SettingsRepository.isAlreadyLogin && SettingsRepository.isLocalMylistEnabled) {
+                MylistSyncManager.sync()
+            }
+        }
         viewModelScope.launch {
             // 仅订阅本地化开关，其他设置变化（主题 / 语言等）不触发重订阅与重载
             SettingsRepository.settings
@@ -112,12 +120,24 @@ class MyPlayListViewModel : ViewModel() {
                 .distinctUntilChanged()
                 .flatMapLatest { enabled ->
                     if (enabled) {
-                        observeLocalPlaylists().onEach { playlists ->
-                            _cachedMyPlayList.value = playlists
-                            _myPlaylistsFlow.value = WebsiteState.Success(Playlists(playlists))
-                            _isLoadingMorePlaylists.value = false
-                            _noMorePlaylists.value = true
-                            runCatching { _refreshCompleted.emit(Unit) }
+                        // 同步期间：清空缓存并置 Loading（复用中央 LoadingIndicator），
+                        // 避免同步完成前闪现空态或旧数据误导用户
+                        combine(
+                            observeLocalPlaylists(),
+                            MylistSyncManager.isSyncing,
+                        ) { playlists, syncing ->
+                            if (syncing) {
+                                _cachedMyPlayList.value = emptyList()
+                                _myPlaylistsFlow.value = WebsiteState.Loading
+                                _isLoadingMorePlaylists.value = false
+                                _noMorePlaylists.value = true
+                            } else {
+                                _cachedMyPlayList.value = playlists
+                                _myPlaylistsFlow.value = WebsiteState.Success(Playlists(playlists))
+                                _isLoadingMorePlaylists.value = false
+                                _noMorePlaylists.value = true
+                                runCatching { _refreshCompleted.emit(Unit) }
+                            }
                         }.map { Unit }
                     } else {
                         _cachedMyPlayList.value = emptyList()

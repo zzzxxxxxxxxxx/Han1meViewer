@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -55,22 +56,32 @@ class LocalVideoListViewModel(
         emptyList()
     )
 
-    // 本地数据全量加载，无分页：VideoGridScreen 需要这两个状态位
-    val loadedPageCount: StateFlow<Int> = MutableStateFlow(1)
+    // 本地数据全量加载，无分页：VideoGridScreen 需要这两个状态位。
+    // 同步期间 loadedPageCount 置 0 触发 VideoGridScreen 的 bootstrap 加载动画，
+    // 同步结束恢复 1（不再触发）。
+    val loadedPageCount: StateFlow<Int> = MylistSyncManager.isSyncing
+        .map { if (it) 0 else 1 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
     val isLoadingMore: StateFlow<Boolean> = MutableStateFlow(false)
 
     private val _deleteFlow = MutableSharedFlow<WebsiteState<Boolean>>()
     val deleteFlow = _deleteFlow.asSharedFlow()
 
     init {
+        // 登录+开关：进入页面即触发同步并在首帧前置位 isSyncing，
+        // 同步期间列表显示加载动画，避免闪现空态或旧数据误导用户
+        // （路由层 LaunchedEffect 仍会触发 sync，tryLock 幂等无副作用）。
+        if (SettingsRepository.isAlreadyLogin && SettingsRepository.isLocalMylistEnabled) {
+            viewModelScope.launch { MylistSyncManager.sync() }
+        }
         viewModelScope.launch {
-            items.collect { items ->
-                _itemsStateFlow.value = if (items.isEmpty()) {
-                    PageLoadingState.NoMoreData
-                } else {
-                    PageLoadingState.Success(MyListItems(items))
+            combine(MylistSyncManager.isSyncing, items) { syncing, list ->
+                when {
+                    syncing -> PageLoadingState.Loading
+                    list.isEmpty() -> PageLoadingState.NoMoreData
+                    else -> PageLoadingState.Success(MyListItems(list))
                 }
-            }
+            }.collect { _itemsStateFlow.value = it }
         }
     }
 
