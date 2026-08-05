@@ -189,4 +189,14 @@ interface LocalMylistDao {
         tombstones.forEach { upsertTombstone(it) }
         playlistItemTombstones.forEach { upsertPlaylistItemTombstone(it) }
     }
+
+    /** 清空全部本地收藏数据（单事务，中途失败不留半清空状态）。 */
+    @Transaction
+    suspend fun clearAllLocalMylist() {
+        deleteAllVideos()
+        deleteAllPlaylists()
+        deleteAllPlaylistItems()
+        deleteAllTombstones()
+        deleteAllPlaylistItemTombstones()
+    }
 }

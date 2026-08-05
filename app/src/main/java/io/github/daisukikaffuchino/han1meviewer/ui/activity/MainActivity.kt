@@ -26,6 +26,7 @@ import io.github.daisukikaffuchino.han1meviewer.HanimeConstants.ANIME_URL
 import io.github.daisukikaffuchino.han1meviewer.HanimeConstants.HANIME_URL
 import io.github.daisukikaffuchino.han1meviewer.BuildConfig
 import io.github.daisukikaffuchino.han1meviewer.logic.DatabaseRepo
+import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.logout
@@ -245,7 +246,8 @@ class MainActivity : BaseActivity() {
     fun logoutWithRefresh(clearLocalData: Boolean = false) {
         lifecycleScope.launch {
             if (clearLocalData) {
-                runCatching { DatabaseRepo.LocalMylist.clearAll() }
+                // 与同步引擎互斥：等待在跑同步结束后清库，避免云端数据写回
+                runCatching { MylistSyncManager.clearLocalMylistWithLock() }
             }
             logout()
             viewModel.getHomePage()

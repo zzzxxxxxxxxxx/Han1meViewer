@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -105,24 +106,28 @@ class MyPlayListViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            SettingsRepository.settings.flatMapLatest { settings ->
-                if (settings.enableLocalMylist) {
-                    observeLocalPlaylists().onEach { playlists ->
-                        _cachedMyPlayList.value = playlists
-                        _myPlaylistsFlow.value = WebsiteState.Success(Playlists(playlists))
-                        _isLoadingMorePlaylists.value = false
-                        _noMorePlaylists.value = true
-                        runCatching { _refreshCompleted.emit(Unit) }
-                    }.map { Unit }
-                } else {
-                    _cachedMyPlayList.value = emptyList()
-                    _myPlaylistsFlow.value = WebsiteState.Loading
-                    loadMyPlayList(1, forceReload = true)
-                    flow {
-                        emit(Unit)
+            // 仅订阅本地化开关，其他设置变化（主题 / 语言等）不触发重订阅与重载
+            SettingsRepository.settings
+                .map { it.enableLocalMylist }
+                .distinctUntilChanged()
+                .flatMapLatest { enabled ->
+                    if (enabled) {
+                        observeLocalPlaylists().onEach { playlists ->
+                            _cachedMyPlayList.value = playlists
+                            _myPlaylistsFlow.value = WebsiteState.Success(Playlists(playlists))
+                            _isLoadingMorePlaylists.value = false
+                            _noMorePlaylists.value = true
+                            runCatching { _refreshCompleted.emit(Unit) }
+                        }.map { Unit }
+                    } else {
+                        _cachedMyPlayList.value = emptyList()
+                        _myPlaylistsFlow.value = WebsiteState.Loading
+                        loadMyPlayList(1, forceReload = true)
+                        flow {
+                            emit(Unit)
+                        }
                     }
-                }
-            }.collect()
+                }.collect()
         }
     }
 
@@ -326,8 +331,10 @@ class MyPlayListViewModel : ViewModel() {
                 // 本地操作即时生效
                 DatabaseRepo.LocalMylist.deletePlaylistItem(listCode, videoCode)
                 _deleteFromPlaylistFlow.emit(WebsiteState.Success(position))
+                // 按 videoCode 过滤而非按 position 移除：Room 流可能已先发出
+                // 新列表，CAS 重试时旧快照的 position 会越界崩溃
                 _playlistFlow.update { prevList ->
-                    prevList.toMutableList().apply { removeAt(position) }
+                    prevList.filterNot { it.videoCode == videoCode }
                 }
                 if (SettingsRepository.isAlreadyLogin) {
                     // 已登录：立即删除云端（并行），失败则记录墓碑（登录同步时补偿）
@@ -354,7 +361,7 @@ class MyPlayListViewModel : ViewModel() {
                 _deleteFromPlaylistFlow.emit(it)
                 _playlistFlow.update { prevList ->
                     if (it is WebsiteState.Success) {
-                        prevList.toMutableList().apply { removeAt(position) }
+                        prevList.filterNot { it.videoCode == videoCode }
                     } else prevList
                 }
             }

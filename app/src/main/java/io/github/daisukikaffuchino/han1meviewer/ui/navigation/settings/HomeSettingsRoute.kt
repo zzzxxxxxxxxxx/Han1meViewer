@@ -282,7 +282,8 @@ fun HomeSettingsRouteScreen(
         },
         onClearLocalMylistData = {
             coroutineScope.launch {
-                DatabaseRepo.LocalMylist.clearAll()
+                // 与同步引擎互斥，清库后再同步（重新拉取云端）
+                runCatching { MylistSyncManager.clearLocalMylistWithLock() }
                 if (SettingsRepository.isAlreadyLogin) {
                     MylistSyncManager.sync()
                 }

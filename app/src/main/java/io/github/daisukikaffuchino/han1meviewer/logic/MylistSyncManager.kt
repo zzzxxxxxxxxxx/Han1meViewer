@@ -16,6 +16,7 @@ import io.github.daisukikaffuchino.han1meviewer.ui.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 本地收藏 / 稍后观看 / 播放清单 与云端的同步引擎。
@@ -31,6 +32,18 @@ import kotlinx.coroutines.sync.Mutex
 object MylistSyncManager {
 
     private val syncMutex = Mutex()
+
+    /**
+     * 清空本地全部收藏 / 稍后观看 / 播放清单数据。
+     *
+     * 与 [sync] 共用互斥锁：登出清库瞬间若有同步在运行（pull 阶段），
+     * 云端数据可能写回刚清空的库；等待锁释放后再清空，避免残留。
+     */
+    suspend fun clearLocalMylistWithLock() {
+        syncMutex.withLock {
+            DatabaseRepo.LocalMylist.clearAll()
+        }
+    }
 
     /**
      * 执行双向合并。登录成功后或打开列表界面时调用，
@@ -240,7 +253,9 @@ object MylistSyncManager {
         var page = 1
         var index = 0
         var completed = true
-        while (page <= 100) {
+        // 无页数上限：空页或请求失败自然退出。若设硬上限，达到上限时
+        // 第上限页之后的数据会被 removeMissingSyncedEntries 误判为「云端缺失」而本地清除
+        while (true) {
             val state = runCatching {
                 NetworkRepo.getMyListItems(userId, listType, page).first()
             }.getOrNull()
@@ -366,7 +381,8 @@ object MylistSyncManager {
         val result = mutableListOf<Playlists.Playlist>()
         var page = 1
         var completed = true
-        while (page <= 100) {
+        // 无页数上限：空页或请求失败自然退出，避免达到上限后误删上限之外的清单
+        while (true) {
             val playlists = runCatching {
                 NetworkRepo.getPlaylists(page, userId).first() as? WebsiteState.Success
             }.getOrNull()?.info?.playlists
@@ -390,7 +406,8 @@ object MylistSyncManager {
         var page = 1
         var index = 0
         var completed = true
-        while (page <= 100) {
+        // 无页数上限：空页或请求失败自然退出，避免达到上限后误删上限之外的条目
+        while (true) {
             val state = runCatching {
                 NetworkRepo.getMyPlayListItems(page, playlistCode).first()
             }.getOrNull()
