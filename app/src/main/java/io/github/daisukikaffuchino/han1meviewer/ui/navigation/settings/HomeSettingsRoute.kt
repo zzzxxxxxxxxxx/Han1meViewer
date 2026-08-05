@@ -56,6 +56,7 @@ import io.github.daisukikaffuchino.han1meviewer.logic.MylistSyncManager
 import io.github.daisukikaffuchino.han1meviewer.logic.SettingsRepository
 import io.github.daisukikaffuchino.han1meviewer.R
 import io.github.daisukikaffuchino.han1meviewer.logic.BackupManager
+import io.github.daisukikaffuchino.han1meviewer.logic.dao.LocalMylistDatabase
 import io.github.daisukikaffuchino.han1meviewer.logic.model.AppLanguage
 import io.github.daisukikaffuchino.han1meviewer.logic.model.DisplayDensity
 import io.github.daisukikaffuchino.han1meviewer.logic.model.PaletteStyle
@@ -116,6 +117,30 @@ fun HomeSettingsRouteScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         pendingImportUri = uri
+    }
+
+    val dbExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        coroutineScope.launch(Dispatchers.IO) {
+            runCatching {
+                // WAL 合并进主库文件，保证导出内容完整
+                runCatching {
+                    LocalMylistDatabase.instance.openHelper.writableDatabase
+                        .query("PRAGMA wal_checkpoint(TRUNCATE)")
+                        .close()
+                }
+                val dbFile = context.getDatabasePath(LocalMylistDatabase.DB_NAME) ?: error("db not found")
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    dbFile.inputStream().use { it.copyTo(output) }
+                } ?: error("cannot open output")
+            }.onSuccess {
+                withContext(Dispatchers.Main) { SonnerToast.success(R.string.export_database_success) }
+            }.onFailure {
+                withContext(Dispatchers.Main) { SonnerToast.error(R.string.export_database_failed) }
+            }
+        }
     }
 
     val hanimeAppName = stringResource(R.string.hanime_app_name)
@@ -292,6 +317,9 @@ fun HomeSettingsRouteScreen(
         },
         onTriggerCrash = {
             throw RuntimeException("Crash triggered from developer options")
+        },
+        onExportLocalDatabase = {
+            dbExportLauncher.launch(LocalMylistDatabase.DB_NAME)
         },
         hKeyframeSettingsContent = {
             HKeyframeSettingsRouteScreen(

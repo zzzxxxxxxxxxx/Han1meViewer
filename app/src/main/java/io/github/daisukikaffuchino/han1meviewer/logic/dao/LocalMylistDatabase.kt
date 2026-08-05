@@ -30,11 +30,13 @@ abstract class LocalMylistDatabase : RoomDatabase() {
     abstract val localMylistDao: LocalMylistDao
 
     companion object {
+        const val DB_NAME = "mylist.db"
+
         val instance by lazy {
             Room.databaseBuilder(
                 applicationContext,
                 LocalMylistDatabase::class.java,
-                "mylist.db"
+                DB_NAME
             ).build()
         }
     }

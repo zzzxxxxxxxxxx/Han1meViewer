@@ -89,6 +89,7 @@ fun HomeSettingsScreen(
     onAlwaysShowUpdateCardChange: (Boolean) -> Unit,
     onDisplayDensityChange: (Int) -> Unit,
     onTriggerCrash: () -> Unit,
+    onExportLocalDatabase: () -> Unit,
     onHomeCategoryPreferencesChange: (List<String>, Set<String>) -> Unit,
     hKeyframeSettingsContent: @Composable () -> Unit,
     networkSettingsContent: @Composable () -> Unit,
@@ -543,6 +544,12 @@ fun HomeSettingsScreen(
                             iconRes = R.drawable.ic_bug_report,
                             onClick = onTriggerCrash,
                         )
+                        SettingNavigationItem(
+                            title = stringResource(R.string.export_local_database),
+                            summary = stringResource(R.string.export_local_database_summary),
+                            iconRes = R.drawable.ic_database,
+                            onClick = onExportLocalDatabase,
+                        )
                     }
                 }
             }
@@ -657,6 +664,7 @@ private fun HomeSettingsScreenPreview() {
             onAlwaysShowUpdateCardChange = {},
             onDisplayDensityChange = {},
             onTriggerCrash = {},
+            onExportLocalDatabase = {},
             onHomeCategoryPreferencesChange = { _, _ -> },
             hKeyframeSettingsContent = {},
             networkSettingsContent = {},

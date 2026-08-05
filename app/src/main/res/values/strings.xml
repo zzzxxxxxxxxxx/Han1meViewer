@@ -689,6 +689,10 @@ Recommendations are as follows:\n
     <string name="display_density">Display density</string>
     <string name="trigger_crash">Trigger crash</string>
     <string name="trigger_crash_summary">Immediately throw an uncaught exception to test crash handling</string>
+    <string name="export_local_database">Export local database</string>
+    <string name="export_local_database_summary">Export mylist.db for debugging</string>
+    <string name="export_database_success">Local database exported</string>
+    <string name="export_database_failed">Failed to export local database</string>
     <string name="crash_page_title">Han1meViewer crashed</string>
     <string name="crash_unexpected_title">Something went wrong</string>
     <string name="crash_unexpected_message">Han1meViewer encountered an unhandled error. You can copy the diagnostic log before restarting.</string>

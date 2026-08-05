@@ -674,6 +674,10 @@
     <string name="display_density">显示密度</string>
     <string name="trigger_crash">主动崩溃</string>
     <string name="trigger_crash_summary">立即抛出未捕获异常，用于测试崩溃处理</string>
+    <string name="export_local_database">导出本地数据库</string>
+    <string name="export_local_database_summary">导出 mylist.db 用于调试</string>
+    <string name="export_database_success">本地数据库已导出</string>
+    <string name="export_database_failed">本地数据库导出失败</string>
     <string name="crash_page_title">Han1meViewer 发生崩溃</string>
     <string name="crash_unexpected_title">出现了问题</string>
     <string name="crash_unexpected_message">Han1meViewer 遇到了未处理的错误。你可以在重启前复制以下诊断日志。</string>

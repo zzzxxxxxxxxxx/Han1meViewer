@@ -660,6 +660,10 @@
     <string name="display_density">顯示密度</string>
     <string name="trigger_crash">主動崩潰</string>
     <string name="trigger_crash_summary">立即拋出未捕獲例外，用於測試崩潰處理</string>
+    <string name="export_local_database">匯出本機資料庫</string>
+    <string name="export_local_database_summary">匯出 mylist.db 用於除錯</string>
+    <string name="export_database_success">本機資料庫已匯出</string>
+    <string name="export_database_failed">本機資料庫匯出失敗</string>
     <string name="crash_page_title">Han1meViewer 發生崩潰</string>
     <string name="crash_unexpected_title">發生了問題</string>
     <string name="crash_unexpected_message">Han1meViewer 遇到了未處理的錯誤。你可以在重新啟動前複製以下診斷記錄。</string>
