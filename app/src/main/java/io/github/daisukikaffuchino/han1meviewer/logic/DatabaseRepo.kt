@@ -385,6 +385,17 @@ object DatabaseRepo {
             )
         }
 
+        /**
+         * 备份导入：清空并写入全部本地收藏数据（单事务）。
+         */
+        suspend fun importLocalMylist(
+            videos: List<LocalVideoEntity>,
+            playlists: List<LocalPlaylistEntity>,
+            playlistItems: List<LocalPlaylistItemEntity>,
+            tombstones: List<LocalMylistTombstoneEntity>,
+            playlistItemTombstones: List<LocalPlaylistItemTombstoneEntity>,
+        ) = dao.importLocalMylist(videos, playlists, playlistItems, tombstones, playlistItemTombstones)
+
         //</editor-fold>
 
         /**

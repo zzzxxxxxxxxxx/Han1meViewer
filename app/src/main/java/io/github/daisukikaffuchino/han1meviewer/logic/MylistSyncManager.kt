@@ -1,6 +1,7 @@
 package io.github.daisukikaffuchino.han1meviewer.logic
 
 import io.github.daisukikaffuchino.han1meviewer.EMPTY_STRING
+import io.github.daisukikaffuchino.utils.LogUtil
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemEntity
@@ -36,6 +37,8 @@ object MylistSyncManager {
      * 未登录、未开启本地化功能或正在同步中直接返回，失败不影响调用方。
      *
      * 顺序统一为「先推后拉」：墓碑 → 本地脏数据推送 → 云端拉取合并。
+     * 主体整体兜底异常（网络调用内部已有 runCatching，此处兜底 DB 层等
+     * 意外异常），同步是尽力而为，绝不向调用方（LaunchedEffect 等）抛异常。
      */
     suspend fun sync() {
         if (!syncMutex.tryLock()) return
@@ -52,6 +55,8 @@ object MylistSyncManager {
             pullFavorites(userId)
             pullWatchLater(userId)
             syncPlaylists(userId, token)
+        } catch (t: Throwable) {
+            LogUtil.e("mylist_sync_failed", t)
         } finally {
             syncMutex.unlock()
         }
@@ -463,20 +468,28 @@ object MylistSyncManager {
      * app 创建清单时云端接口不返回 code，创建成功后本地仍是 UUID，
      * 此期间对清单的修改无法即时推送到云端。调用本方法（拉取云端列表 +
      * 同名匹配）立即完成映射，消除「UUID 未映射期」。未登录或无脏清单时无操作。
+     *
+     * 与 [sync] 共用互斥锁，避免并发执行迁移（migrateLocalPlaylist）时
+     * 重复写入 / 旧名覆盖云端新名。
      */
     suspend fun mapLocalPlaylistCodes() {
-        if (!SettingsRepository.isAlreadyLogin) return
-        if (DatabaseRepo.LocalMylist.getDirtyPlaylists().isEmpty()) return
-        val userId = SettingsRepository.savedUserId
-        if (userId.isBlank()) return
-        val remote = pullPlaylistList(userId).first
-        val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
-        val unmatchedRemote = remote.filter { !localAll.containsKey(it.listCode) }.toMutableList()
-        for (playlist in DatabaseRepo.LocalMylist.getDirtyPlaylists()) {
-            if (unmatchedRemote.isEmpty()) break
-            val matched = unmatchedRemote.firstOrNull { it.title == playlist.name } ?: continue
-            migrateLocalPlaylist(playlist, matched.listCode)
-            unmatchedRemote.remove(matched)
+        if (!syncMutex.tryLock()) return
+        try {
+            if (!SettingsRepository.isAlreadyLogin) return
+            if (DatabaseRepo.LocalMylist.getDirtyPlaylists().isEmpty()) return
+            val userId = SettingsRepository.savedUserId
+            if (userId.isBlank()) return
+            val remote = pullPlaylistList(userId).first
+            val localAll = DatabaseRepo.LocalMylist.getAllPlaylists().associateBy { it.code }
+            val unmatchedRemote = remote.filter { !localAll.containsKey(it.listCode) }.toMutableList()
+            for (playlist in DatabaseRepo.LocalMylist.getDirtyPlaylists()) {
+                if (unmatchedRemote.isEmpty()) break
+                val matched = unmatchedRemote.firstOrNull { it.title == playlist.name } ?: continue
+                migrateLocalPlaylist(playlist, matched.listCode)
+                unmatchedRemote.remove(matched)
+            }
+        } finally {
+            syncMutex.unlock()
         }
     }
 
@@ -553,6 +566,10 @@ object MylistSyncManager {
     /**
      * 把本地清单迁移到云端 code：清单内视频的 playlistCode 一并迁移，
      * 覆盖本地 code 并标记 synced，然后删除旧的本地行。
+     *
+     * createdTime 赋为当前时刻：离线新建清单可能创建于很久以前，保留旧值
+     * 会在登录同步后排到所有云端清单之下（沉底）；迁移时刷新为 now 使其
+     * 立即显示在顶部（同步完成后仍由 syncPlaylists 按云端顺序重排）。
      */
     private suspend fun migrateLocalPlaylist(playlist: LocalPlaylistEntity, cloudCode: String) {
         val items = DatabaseRepo.LocalMylist.getPlaylistItems(playlist.code)
@@ -562,7 +579,7 @@ object MylistSyncManager {
             )
         }
         DatabaseRepo.LocalMylist.upsertPlaylist(
-            playlist.copy(code = cloudCode, synced = true)
+            playlist.copy(code = cloudCode, createdTime = System.currentTimeMillis(), synced = true)
         )
         DatabaseRepo.LocalMylist.deletePlaylist(playlist.code)
         // 清理旧 code 下残留的清单条目行（迁移后的行已写入新 code）

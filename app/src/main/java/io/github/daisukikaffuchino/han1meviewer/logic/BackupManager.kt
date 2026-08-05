@@ -160,46 +160,33 @@ object BackupManager {
             backup.localPlaylistItems != null || backup.localMylistTombstones != null ||
             backup.localPlaylistItemTombstones != null
         ) {
-            val dao = LocalMylistDatabase.instance.localMylistDao
-            backup.localVideos?.let { localVideos ->
-                dao.deleteAllVideos()
-                dao.upsertVideos(
+            // 整体单事务写入，中途失败不留下半清空状态
+            DatabaseRepo.LocalMylist.importLocalMylist(
+                videos = backup.localVideos?.let { localVideos ->
                     if (pushToCloud) {
                         // 全量推送模式：导入的数据视为未同步，下次同步推送到云端
                         localVideos.map { it.copy(favSynced = false, watchLaterSynced = false) }
                     } else {
                         localVideos
                     }
-                )
-            }
-            backup.localPlaylists?.let { localPlaylists ->
-                dao.deleteAllPlaylists()
-                dao.upsertPlaylists(
+                }.orEmpty(),
+                playlists = backup.localPlaylists?.let { localPlaylists ->
                     if (pushToCloud) {
                         localPlaylists.map { it.copy(synced = false) }
                     } else {
                         localPlaylists
                     }
-                )
-            }
-            backup.localPlaylistItems?.let { localPlaylistItems ->
-                dao.deleteAllPlaylistItems()
-                dao.upsertPlaylistItems(
+                }.orEmpty(),
+                playlistItems = backup.localPlaylistItems?.let { localPlaylistItems ->
                     if (pushToCloud) {
                         localPlaylistItems.map { it.copy(synced = false) }
                     } else {
                         localPlaylistItems
                     }
-                )
-            }
-            backup.localMylistTombstones?.let { tombstones ->
-                dao.deleteAllTombstones()
-                tombstones.forEach { dao.upsertTombstone(it) }
-            }
-            backup.localPlaylistItemTombstones?.let { tombstones ->
-                dao.deleteAllPlaylistItemTombstones()
-                tombstones.forEach { dao.upsertPlaylistItemTombstone(it) }
-            }
+                }.orEmpty(),
+                tombstones = backup.localMylistTombstones.orEmpty(),
+                playlistItemTombstones = backup.localPlaylistItemTombstones.orEmpty(),
+            )
         }
 
         backup.settings?.let { settings ->

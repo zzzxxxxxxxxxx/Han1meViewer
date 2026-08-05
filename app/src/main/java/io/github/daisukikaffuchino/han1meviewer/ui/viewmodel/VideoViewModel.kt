@@ -420,7 +420,9 @@ class VideoViewModel(
                         }
                     }
                 } else {
-                    if (!isChecked) {
+                    // 未登录取消勾选：仅已同步的条目记录墓碑（云端存在、需推送删除），
+                    // 未同步条目云端不存在，直接本地删除即可
+                    if (!isChecked && base.watchLaterSynced) {
                         DatabaseRepo.LocalMylist.upsertTombstoneMerged(videoCode, isWatchLater = true)
                     }
                     _modifyMyListFlow.emit(WebsiteState.Success(position))

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalMylistTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistItemTombstoneEntity
 import io.github.daisukikaffuchino.han1meviewer.logic.entity.mylist.LocalPlaylistEntity
@@ -158,4 +159,34 @@ interface LocalMylistDao {
     suspend fun deleteAllPlaylistItemTombstones()
 
     //</editor-fold>
+
+    /**
+     * 备份导入：清空并写入全部本地收藏数据，整体包在单个事务中，
+     * 避免中途失败留下半清空状态。
+     *
+     * @param videos 已按 pushToCloud 处理（标记未同步）的收藏 / 稍后观看数据
+     * @param playlists 已按 pushToCloud 处理的播放清单
+     * @param playlistItems 已按 pushToCloud 处理的清单内视频
+     * @param tombstones 视频 / 清单维度删除墓碑
+     * @param playlistItemTombstones 清单内视频删除墓碑
+     */
+    @Transaction
+    suspend fun importLocalMylist(
+        videos: List<LocalVideoEntity>,
+        playlists: List<LocalPlaylistEntity>,
+        playlistItems: List<LocalPlaylistItemEntity>,
+        tombstones: List<LocalMylistTombstoneEntity>,
+        playlistItemTombstones: List<LocalPlaylistItemTombstoneEntity>,
+    ) {
+        deleteAllVideos()
+        deleteAllPlaylists()
+        deleteAllPlaylistItems()
+        deleteAllTombstones()
+        deleteAllPlaylistItemTombstones()
+        if (videos.isNotEmpty()) upsertVideos(videos)
+        if (playlists.isNotEmpty()) upsertPlaylists(playlists)
+        if (playlistItems.isNotEmpty()) upsertPlaylistItems(playlistItems)
+        tombstones.forEach { upsertTombstone(it) }
+        playlistItemTombstones.forEach { upsertPlaylistItemTombstone(it) }
+    }
 }

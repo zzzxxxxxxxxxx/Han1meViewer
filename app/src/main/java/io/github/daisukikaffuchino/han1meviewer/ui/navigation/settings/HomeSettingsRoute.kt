@@ -125,15 +125,27 @@ fun HomeSettingsRouteScreen(
         uri ?: return@rememberLauncherForActivityResult
         coroutineScope.launch(Dispatchers.IO) {
             runCatching {
-                // WAL 合并进主库文件，保证导出内容完整
+                // WAL 合并进主库文件，保证导出内容完整。
+                // 返回行格式：(busy, log, checkpointed)；busy > 0 表示有其他
+                // 连接在读，TRUNCATE 退化为 PASSIVE，此时连带拷贝 -wal 文件，
+                // sqlite3 打开时会自动合并，避免静默丢失未落盘数据
+                var walMerged = false
                 runCatching {
-                    LocalMylistDatabase.instance.openHelper.writableDatabase
+                    val cursor = LocalMylistDatabase.instance.openHelper.writableDatabase
                         .query("PRAGMA wal_checkpoint(TRUNCATE)")
-                        .close()
+                    val busy = cursor.use { it.moveToFirst() && it.getInt(0) > 0 }
+                    walMerged = !busy
                 }
                 val dbFile = context.getDatabasePath(LocalMylistDatabase.DB_NAME) ?: error("db not found")
                 context.contentResolver.openOutputStream(uri)?.use { output ->
                     dbFile.inputStream().use { it.copyTo(output) }
+                    if (!walMerged) {
+                        context.getDatabasePath(LocalMylistDatabase.DB_NAME + "-wal")?.let { walFile ->
+                            if (walFile.exists()) {
+                                walFile.inputStream().use { it.copyTo(output) }
+                            }
+                        }
+                    }
                 } ?: error("cannot open output")
             }.onSuccess {
                 withContext(Dispatchers.Main) { SonnerToast.success(R.string.export_database_success) }
